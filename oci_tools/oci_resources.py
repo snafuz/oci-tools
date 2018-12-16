@@ -1,6 +1,6 @@
 import logging
 
-class OCI_Resource(dict):
+class OciResource(dict):
     """
     archetype for OCI resources
     it contains the current resources and all the nested ones
@@ -16,7 +16,7 @@ class OCI_Resource(dict):
 
     def __setitem__(self, key, value):
         self.setdefault('nested', []).append({key:value})
-        if issubclass(type(value),OCI_Resource):
+        if issubclass(type(value), OciResource):
             self._nested_resources.append(value.resource)
 
     @property
@@ -62,7 +62,7 @@ class OCI_Resource(dict):
 ####################################
 # Resource definitions
 ####################################
-class OCI_Instance(OCI_Resource):
+class OciInstance(OciResource):
 
     def __init__(self,res, api_client=None):
         super().__init__(res,
@@ -75,7 +75,7 @@ class OCI_Instance(OCI_Resource):
         pass
 
 
-class OCI_Vnic(OCI_Resource):
+class OciVnic(OciResource):
 
     def __init__(self,res, api_client=None):
         super().__init__(res,
@@ -89,7 +89,7 @@ class OCI_Vnic(OCI_Resource):
 
 
 
-class OCI_VCN(OCI_Resource):
+class OciVcn(OciResource):
 
     def __init__(self,res, api_client=None):
         super().__init__(res,
@@ -102,7 +102,7 @@ class OCI_VCN(OCI_Resource):
         pass
 
 
-class OCI_Subnet(OCI_Resource):
+class OciSubnet(OciResource):
 
     def __init__(self, res, api_client=None):
         super().__init__(res,
@@ -117,7 +117,7 @@ class OCI_Subnet(OCI_Resource):
 
 
 
-class OCI_IG(OCI_Resource):
+class OciInternetGw(OciResource):
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
@@ -126,7 +126,7 @@ class OCI_IG(OCI_Resource):
                          res_type='igw')
 
 
-class OCI_NatGateway(OCI_Resource):
+class OciNatGw(OciResource):
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
@@ -135,7 +135,7 @@ class OCI_NatGateway(OCI_Resource):
                          res_type='natgw')
 
 
-class OCI_DRG(OCI_Resource):
+class OciDRG(OciResource):
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
@@ -147,7 +147,7 @@ class OCI_DRG(OCI_Resource):
         pass
 
 
-class OCI_ServiceGateway(OCI_Resource):
+class OciServiceGw(OciResource):
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
@@ -159,7 +159,7 @@ class OCI_ServiceGateway(OCI_Resource):
         pass
 
 
-class OCI_LocalPeeringGw(OCI_Resource):
+class OciLocalPeeringGw(OciResource):
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
@@ -171,7 +171,7 @@ class OCI_LocalPeeringGw(OCI_Resource):
         pass
 
 
-class OCI_SecurityList(OCI_Resource):
+class OciSecurityList(OciResource):
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
@@ -183,7 +183,7 @@ class OCI_SecurityList(OCI_Resource):
         pass
 
 
-class OCI_RouteTable(OCI_Resource):
+class OciRouteTable(OciResource):
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,

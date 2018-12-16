@@ -97,10 +97,10 @@ def _get_instance_resources(compute_client,tree):
     """
     ilist = compute_client.list_instances(compartment_id=tree['id'])
     for i in ilist.data:
-        instance = OCI_Instance(i)
+        instance = OciInstance(i)
         vnics_list = compute_client.list_vnic_attachments(compartment_id=tree['id'], instance_id = i.id)
         for v in vnics_list.data:
-            rv=OCI_Vnic(v)
+            rv=OciVnic(v)
             instance[rv.resource_type]= rv
         tree.setdefault(instance.resource_type,[]).append(instance)
 
@@ -111,41 +111,41 @@ def _get_network_resources(network_client,tree):
     """
     ilist = network_client.list_vcns(compartment_id=tree['id'])
     for i in ilist.data:
-        vcn = OCI_VCN(i)
+        vcn = OciVcn(i)
         #Subnet
         subnet = network_client.list_subnets(compartment_id=tree['id'], vcn_id = vcn.id)
         for v in subnet.data:
-            rv=OCI_Subnet(v)
+            rv=OciSubnet(v)
             vcn[rv.resource_type]= rv
         #Internet Gateway
         ig = network_client.list_internet_gateways(compartment_id=tree['id'], vcn_id = vcn.id)
         for v in ig.data:
-            rv = OCI_IG(v)
+            rv = OciInternetGw(v)
             vcn[rv.resource_type] = rv
         #Nat Gateway
         ng = network_client.list_nat_gateways(compartment_id=tree['id'], vcn_id = vcn.id)
         for v in ng.data:
-            rv = OCI_NatGateway(v)
+            rv = OciNatGw(v)
             vcn[rv.resource_type] = rv
         #Security List
         sl = network_client.list_security_lists(compartment_id=tree['id'], vcn_id = vcn.id)
         for v in sl.data:
-            rv = OCI_SecurityList(v)
+            rv = OciSecurityList(v)
             vcn[rv.resource_type] = rv
         #Route Table
         rt = network_client.list_route_tables(compartment_id=tree['id'], vcn_id=vcn.id)
         for v in rt.data:
-            rv = OCI_RouteTable(v)
+            rv = OciRouteTable(v)
             vcn[rv.resource_type] = rv
         #ServiceGateway
         sg = network_client.list_service_gateways(compartment_id=tree['id'], vcn_id=vcn.id)
         for v in sg.data:
-            rv = OCI_ServiceGateway(v)
+            rv = OciServiceGw(v)
             vcn[rv.resource_type] = rv
         #Local Peering
         lp = network_client.list_local_peering_gateways(compartment_id=tree['id'], vcn_id=vcn.id)
         for v in lp.data:
-            rv = OCI_LocalPeeringGw(v)
+            rv = OciLocalPeeringGw(v)
             vcn[rv.resource_type] = rv
         tree.setdefault(vcn.resource_type, []).append(vcn)
 
