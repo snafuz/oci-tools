@@ -1,0 +1,19 @@
+# ignore all logs
+*.log
+# folders
+test/
+dist/
+
+.vscode/
+.idea/
+
+# config file
+config
+# version file
+.bumpversion.cfg
+
+setup_guide.txt
+
+# python build files
+__pycache__/
+*.pyc
