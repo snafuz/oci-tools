@@ -5,6 +5,8 @@ class OciResource(dict):
     archetype for OCI resources
     it contains the current resources and all the nested ones
     """
+    resource_type = 'oci-resource'
+
     def __init__(self,res,api_client=None,name='resource',id=None,res_type='resource'):
         super().__init__({'name':name, 'id':id, 'nested':[]})
         self._name = name
@@ -18,13 +20,6 @@ class OciResource(dict):
         self.setdefault('nested', []).append({key:value})
         if issubclass(type(value), OciResource):
             self._nested_resources.append(value.resource)
-
-    @property
-    def resource_type(self):
-        """
-        return resource type
-        """
-        return self._res_type
 
     @property
     def resource(self):
@@ -64,25 +59,29 @@ class OciResource(dict):
 ####################################
 class OciInstance(OciResource):
 
+    _res_type = 'instance'
+
     def __init__(self,res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
-                         id=res.id,
-                         res_type='instance')
+                         id=res.id)
 
     def _terminate(self, force=False):
-        pass
+
+        #attached vnics are automatically detached and terminated
+        self._api_client.terminate_instance(self.id, preserve_boot_volume = not force)
 
 
 class OciVnic(OciResource):
 
+    _res_type = 'vnic'
+
     def __init__(self,res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
-                         id=res.id,
-                         res_type='vnic')
+                         id=res.id)
 
     def _terminate(self, force=False):
         pass
@@ -91,25 +90,29 @@ class OciVnic(OciResource):
 
 class OciVcn(OciResource):
 
+    _res_type = 'vcn'
+
     def __init__(self,res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
-                         id=res.id,
-                         res_type='vcn')
+                         id=res.id)
 
     def _terminate(self, force=False):
+        if force:
+            self._nested_resources[OciSecurityList._res_type]
         pass
 
 
 class OciSubnet(OciResource):
 
+    _res_type = 'subnet'
+
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
-                         id=res.id,
-                         res_type='subnet')
+                         id=res.id)
 
     def _terminate(self, force=False):
         pass
@@ -118,82 +121,109 @@ class OciSubnet(OciResource):
 
 
 class OciInternetGw(OciResource):
+
+    _res_type = 'igw'
+
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
-                         id=res.id,
-                         res_type='igw')
+                         id=res.id)
 
 
 class OciNatGw(OciResource):
+
+    _res_type = 'natgw'
+
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
-                         id=res.id,
-                         res_type='natgw')
+                         id=res.id)
 
 
 class OciDRG(OciResource):
+
+    _res_type = 'drg'
+
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
-                         id=res.id,
-                         res_type='drg')
+                         id=res.id)
 
     def _terminate(self, force=False):
         pass
 
 
 class OciServiceGw(OciResource):
+
+    _res_type = 'servicegw'
+
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
-                         id=res.id,
-                         res_type='servicegw')
+                         id=res.id)
 
     def _terminate(self, force=False):
         pass
 
 
 class OciLocalPeeringGw(OciResource):
+
+    _res_type = 'lpg'
+
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
-                         id=res.id,
-                         res_type='lpg')
+                         id=res.id)
 
     def _terminate(self, force=False):
         pass
 
 
 class OciSecurityList(OciResource):
+
+    _res_type = 'securitylist'
+
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
-                         id=res.id,
-                         res_type='securitylist')
+                         id=res.id)
 
     def _terminate(self, force=False):
-        pass
+        self._api_client.delete_security_list(self.id)
 
 
 class OciRouteTable(OciResource):
+
+    _res_type = 'routetable'
+
     def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
-                         id=res.id,
-                         res_type='routetable')
+                         id=res.id)
 
     def _terminate(self, force=False):
         pass
 
+
+class OciBlockVolume(OciResource):
+
+    _res_type = 'bv'
+
+    def __init__(self, res, api_client=None):
+        super().__init__(res,
+                         api_client=api_client,
+                         name=res.display_name,
+                         id=res.id)
+
+    def _terminate(self, force=False):
+        pass
 
     
 
