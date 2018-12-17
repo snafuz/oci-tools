@@ -79,6 +79,7 @@ def resource_list(conf:OCIConfig):
         logging.info("visit compartments in {} region".format(r))
 
         compute_client = oci.core.ComputeClient(conf.config)
+        compute_client.get_instance()
         network_client = oci.core.VirtualNetworkClient(conf.config)
         bv_client = oci.core.BlockstorageClient(conf.config)
 

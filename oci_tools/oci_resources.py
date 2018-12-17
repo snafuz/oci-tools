@@ -1,4 +1,5 @@
 import logging
+import oci
 
 class OciResource(dict):
     """
@@ -13,7 +14,7 @@ class OciResource(dict):
         self._id=id
         self._resource=res
         self._nested_resources=[]
-        self._res_type = res_type
+        self.resource_type = res_type
         self._api_client = api_client
 
     def __setitem__(self, key, value):
@@ -59,7 +60,7 @@ class OciResource(dict):
 ####################################
 class OciInstance(OciResource):
 
-    _res_type = 'instance'
+    resource_type = 'instance'
 
     def __init__(self,res, api_client=None):
         super().__init__(res,
@@ -70,12 +71,19 @@ class OciInstance(OciResource):
     def _terminate(self, force=False):
 
         #attached vnics are automatically detached and terminated
-        self._api_client.terminate_instance(self.id, preserve_boot_volume = not force)
+        try:
+            self._api_client.terminate_instance(self.id, preserve_boot_volume = not force)
+            oci.wait_until(self._api_client,
+                           self._api_client.get_instance(self.id),
+                           'lifecycle_state',
+                           'TERMINATED')
+        except:
+            logging.error('unable to terminate the instance {}'.format(self.id))
 
 
 class OciVnic(OciResource):
 
-    _res_type = 'vnic'
+    resource_type = 'vnic'
 
     def __init__(self,res, api_client=None):
         super().__init__(res,
@@ -90,7 +98,7 @@ class OciVnic(OciResource):
 
 class OciVcn(OciResource):
 
-    _res_type = 'vcn'
+    resource_type = 'vcn'
 
     def __init__(self,res, api_client=None):
         super().__init__(res,
@@ -100,13 +108,13 @@ class OciVcn(OciResource):
 
     def _terminate(self, force=False):
         if force:
-            self._nested_resources[OciSecurityList._res_type]
+            self._nested_resources[OciSecurityList.resource_type]
         pass
 
 
 class OciSubnet(OciResource):
 
-    _res_type = 'subnet'
+    resource_type = 'subnet'
 
     def __init__(self, res, api_client=None):
         super().__init__(res,
@@ -122,7 +130,7 @@ class OciSubnet(OciResource):
 
 class OciInternetGw(OciResource):
 
-    _res_type = 'igw'
+    resource_type = 'igw'
 
     def __init__(self, res, api_client=None):
         super().__init__(res,
@@ -130,10 +138,16 @@ class OciInternetGw(OciResource):
                          name=res.display_name,
                          id=res.id)
 
+    def _terminate(self, force=False):
+        try:
+            self._api_client.delete_internet_gateway(self.id)
+        except:
+            logging.error('unable to delete ig {}'.format(self.id))
+
 
 class OciNatGw(OciResource):
 
-    _res_type = 'natgw'
+    resource_type = 'natgw'
 
     def __init__(self, res, api_client=None):
         super().__init__(res,
@@ -144,7 +158,7 @@ class OciNatGw(OciResource):
 
 class OciDRG(OciResource):
 
-    _res_type = 'drg'
+    resource_type = 'drg'
 
     def __init__(self, res, api_client=None):
         super().__init__(res,
@@ -158,7 +172,7 @@ class OciDRG(OciResource):
 
 class OciServiceGw(OciResource):
 
-    _res_type = 'servicegw'
+    resource_type = 'servicegw'
 
     def __init__(self, res, api_client=None):
         super().__init__(res,
@@ -172,7 +186,7 @@ class OciServiceGw(OciResource):
 
 class OciLocalPeeringGw(OciResource):
 
-    _res_type = 'lpg'
+    resource_type = 'lpg'
 
     def __init__(self, res, api_client=None):
         super().__init__(res,
@@ -186,7 +200,7 @@ class OciLocalPeeringGw(OciResource):
 
 class OciSecurityList(OciResource):
 
-    _res_type = 'securitylist'
+    resource_type = 'securitylist'
 
     def __init__(self, res, api_client=None):
         super().__init__(res,
@@ -200,7 +214,7 @@ class OciSecurityList(OciResource):
 
 class OciRouteTable(OciResource):
 
-    _res_type = 'routetable'
+    resource_type = 'routetable'
 
     def __init__(self, res, api_client=None):
         super().__init__(res,
@@ -214,7 +228,7 @@ class OciRouteTable(OciResource):
 
 class OciBlockVolume(OciResource):
 
-    _res_type = 'bv'
+    resource_type = 'bv'
 
     def __init__(self, res, api_client=None):
         super().__init__(res,
