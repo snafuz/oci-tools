@@ -2,12 +2,43 @@ import logging
 import oci
 
 
+class _Registry:
+    """
+    helper class to keep track of the inner dependency not inferable via compartment scanning
+    It contains a flat dict with all the resources.
+    """
+
+    def __init__(self):
+        self._registry = {}
+
+    def append(self, id, obj):
+        self._registry[id] = obj
+
+    def get(self, id):
+        return self._registry[id]
+
+
+_registry = _Registry()
+
+
 class OciResource(dict):
     """
     archetype for OCI resources
     it contains the current resources and all the nested ones
     """
     resource_type = 'oci-resource'
+
+    @staticmethod
+    def set_dependency(parent_id, nested):
+        """
+        use the registry to inject nested dependency not inferable via compartment scan
+
+        :param parent_id: OCID id of the parent resource you want to append the neted to
+        :param nested:  nested OCI resource
+        """
+        res = _registry.get(parent_id)
+        if res:
+            res[parent_id] = nested
 
     def __init__(self, res, api_client=None, name='resource', id=None, res_type='resource'):
         """
@@ -20,14 +51,15 @@ class OciResource(dict):
         """
         super().__init__({'name':name, 'id':id, 'nested':[]})
         self._name = name
-        self._id=id
+        self._id = id
         self._resource=res
         self._nested_resources=[]
         self.resource_type = res_type
         self._api_client = api_client
+        _registry.append(self._id, self)
 
     def __setitem__(self, key, value):
-        self.setdefault('nested', []).append({key:value})
+        self.setdefault('nested', []).append({key : value})
         if issubclass(type(value), OciResource):
             self._nested_resources.append(value.resource)
 
@@ -133,6 +165,20 @@ class OciSubnet(OciResource):
     def _terminate(self, force=False):
         pass
 
+
+class _SubnetRegistry:
+
+    def __init__(self):
+        self._registry = {}
+
+    def append(self, subnet: OciSubnet):
+        self._registry.setdefault(subnet.id, subnet)
+
+    def get(self, subnet_id):
+        return self._registry[subnet_id]
+
+
+_subnet_registry = _SubnetRegistry()
 
 class OciInternetGw(OciResource):
 

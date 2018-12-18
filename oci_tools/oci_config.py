@@ -1,6 +1,7 @@
 import oci
 from .oci_resources import OciResource
 
+
 class OCIConfig:
 
     def __init__(self, config_path=None, **kwargs):
@@ -46,20 +47,6 @@ class OCIConfig:
     @compartments_tree.setter
     def compartments_tree(self,c_tree):
         self._compartments_tree = c_tree
-
-    @property
-    def vcn_tree(self):
-        return self._vcn_tree
-
-    def vcn_tree_append(self, vcn_id, res: OciResource=None):
-        """
-        VCN dependency tree used for clean-up operation
-
-        :param vcn_id: vcn id to identify the vcn tree
-        :param res: resource the vcn depend on
-        """
-
-        self._vcn_tree.setdefault(vcn_id, {}).setdefault(res.resource_type, []).append(res)
 
     @property
     def config(self):

@@ -100,7 +100,7 @@ def resource_list(conf: OCIConfig):
                 _retrieve_resources_in_compartment(nested_item, region, traverse_level)
                 traverse_level -= 1
         _get_network_resources(tree, region, conf)
-        _get_bv_resorces(tree, region)
+        _get_bv_resorces(tree, region, conf)
         _get_instance_resources(tree, region, conf)
 
     global compute_client
@@ -112,8 +112,8 @@ def resource_list(conf: OCIConfig):
         conf.workon_region = r
         logging.info("visit compartments in {} region".format(r))
 
-        compute_client = oci.core.ComputeClient(conf.config)
         network_client = oci.core.VirtualNetworkClient(conf.config)
+        compute_client = oci.core.ComputeClient(conf.config)
         bv_client = oci.core.BlockstorageClient(conf.config)
 
         # bv_client.list_volumes('').data
@@ -142,8 +142,8 @@ def _get_instance_resources(tree, region, conf: OCIConfig):
 
                 # vcn dependency tree for clean-up operation
                 if isinstance(res_obj, OciVnic):
-                    vid = network_client.get_subnet(r.subnet_id).data.vcn_id
-                    conf.vcn_tree_append(vid, OciInstance(compute_client.get_instance(r.instance_id).data))
+                    OciResource.set_dependency(r.subnet_id, instance)
+
         except:
             logging.error('unable to retrieve {} in [{}] Instance {}'.format(res.resource_type, region, i.id))
 
@@ -174,13 +174,12 @@ def _get_network_resources(tree, region, conf: OCIConfig):
             for r in rlist.data:
                 res_obj = res(r)
                 vcn[res.resource_type] = res_obj
-                conf.vcn_tree_append(vcn.id, res_obj)
+                # conf.vcn_tree_append(vcn.id, res_obj)
         except:
             logging.error('unable to retrieve {} in [{}] VCN {}'.format(res.resource_type, region, vcn.id))
 
     for i in ilist.data:
         vcn = OciVcn(i)
-        conf.vcn_tree_append(i.id, vcn)
         _get_nested_resources(network_client.list_subnets, OciSubnet)
         _get_nested_resources(network_client.list_internet_gateways, OciInternetGw)
         _get_nested_resources(network_client.list_nat_gateways, OciNatGw)
@@ -239,6 +238,10 @@ def _terminate_resources(conf: OCIConfig):
         _get_instance_resources(compute_client, tree, region, conf)
         _get_network_resources(network_client, tree, region)
         _get_bv_resorces(bv_client, tree, region)
+
+    global compute_client
+    global network_client
+    global bv_client
 
     for r in conf.compartments_tree.keys():
         # logging.info(r)
