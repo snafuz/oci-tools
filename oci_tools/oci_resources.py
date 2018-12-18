@@ -9,7 +9,15 @@ class OciResource(dict):
     """
     resource_type = 'oci-resource'
 
-    def __init__(self,res,api_client=None,name='resource',id=None,res_type='resource'):
+    def __init__(self, res, api_client=None, name='resource', id=None, res_type='resource'):
+        """
+        Init OCI Resource
+        :param res: OCI API resource
+        :param api_client:  OCI API Client object
+        :param name: resource name/display_name
+        :param id: resource OCID
+        :param res_type: resource type
+        """
         super().__init__({'name':name, 'id':id, 'nested':[]})
         self._name = name
         self._id=id
@@ -54,7 +62,6 @@ class OciResource(dict):
         Child classes should override this method
         """
         pass
-
 
 
 ####################################
