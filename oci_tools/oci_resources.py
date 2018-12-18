@@ -1,6 +1,7 @@
 import logging
 import oci
 
+
 class OciResource(dict):
     """
     archetype for OCI resources
@@ -47,13 +48,14 @@ class OciResource(dict):
         logging.info('Terminating resource {}'.format(self))
         self._terminate(force)
 
-
     def _terminate(self, force=False):
         """
         internal Terminate implementation
         Child classes should override this method
         """
         pass
+
+
 
 ####################################
 # Resource definitions
@@ -70,7 +72,7 @@ class OciInstance(OciResource):
 
     def _terminate(self, force=False):
 
-        #attached vnics are automatically detached and terminated
+        # attached vnics are automatically detached and terminated
         try:
             self._api_client.terminate_instance(self.id, preserve_boot_volume = not force)
             oci.wait_until(self._api_client,
@@ -93,7 +95,6 @@ class OciVnic(OciResource):
 
     def _terminate(self, force=False):
         pass
-
 
 
 class OciVcn(OciResource):
@@ -124,8 +125,6 @@ class OciSubnet(OciResource):
 
     def _terminate(self, force=False):
         pass
-
-
 
 
 class OciInternetGw(OciResource):
@@ -209,7 +208,14 @@ class OciSecurityList(OciResource):
                          id=res.id)
 
     def _terminate(self, force=False):
-        self._api_client.delete_security_list(self.id)
+        try:
+            self._api_client.delete_security_list(self.id)
+            oci.wait_until(self._api_client,
+                           self._api_client.get_security_list(self.id),
+                           'lifecycle_state',
+                           'TERMINATED')
+        except:
+            logging.error('unable to terminate {} {}'.format(self.resource_type, self.id))
 
 
 class OciRouteTable(OciResource):
@@ -223,7 +229,14 @@ class OciRouteTable(OciResource):
                          id=res.id)
 
     def _terminate(self, force=False):
-        pass
+        try:
+            self._api_client.delete_route_table(self.id)
+            oci.wait_until(self._api_client,
+                           self._api_client.get_route_table(self.id),
+                           'lifecycle_state',
+                           'TERMINATED')
+        except:
+            logging.error('unable to terminate {} {}'.format(self.resource_type, self.id))
 
 
 class OciBlockVolume(OciResource):

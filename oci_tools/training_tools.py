@@ -12,7 +12,7 @@ def scan_tenancy(config:OCIConfig):
     logging.info('{}'.format(pformat(config.compartments_tree)))
 
 
-def compartment_list(conf:OCIConfig):
+def compartment_list(conf: OCIConfig):
     """
     list all compartments
     """
@@ -23,35 +23,37 @@ def compartment_list(conf:OCIConfig):
         compartment_tree[r]=compartment_tree_build(conf)
         logging.info('_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-')
         logging.info('Compartment tree')
-        logging.info('Region: {}\n{}'.format(r,pformat(compartment_tree[r])))
+        logging.info('Region: {}\n{}'.format(r, pformat(compartment_tree[r])))
         logging.info('_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-')
 
     conf.compartments_tree = compartment_tree
 
 
-def compartment_tree_build(conf:OCIConfig):
+def compartment_tree_build(conf: OCIConfig):
     """
     build a full compartment tree
     """
     identity_client=oci.identity.IdentityClient(conf.config)
 
-    elems = oci.pagination.list_call_get_all_results(identity_client.list_compartments,compartment_id=conf.tenancy,compartment_id_in_subtree=True)
+    elems = oci.pagination.list_call_get_all_results(identity_client.list_compartments,
+                                                     compartment_id=conf.tenancy,
+                                                     compartment_id_in_subtree=True)
     elem_with_children = {}
 
-    def _build_children_sub_tree(parent,name):
-          cur_dict = {
-              'name': name,
-              'id': parent,
-          }
-          if parent in elem_with_children.keys():
-              cur_dict["nested"] = [_build_children_sub_tree(cid[0],cid[1]) for cid in elem_with_children[parent]]
-          return cur_dict
+    def _build_children_sub_tree(parent, name):
+        cur_dict = {
+          'name': name,
+          'id': parent,
+        }
+        if parent in elem_with_children.keys():
+            cur_dict["nested"] = [_build_children_sub_tree(cid[0], cid[1]) for cid in elem_with_children[parent]]
+        return cur_dict
 
     for item in elems.data:
-          cid = item.id
-          name = item.name
-          pid = item.compartment_id
-          elem_with_children.setdefault(pid, []).append([cid,name])
+        cid = item.id
+        name = item.name
+        pid = item.compartment_id
+        elem_with_children.setdefault(pid, []).append([cid, name])
 
     res = _build_children_sub_tree(conf.tenancy,'tenancy')
     return res
@@ -73,7 +75,7 @@ def resource_list(conf:OCIConfig):
         _get_network_resources(network_client, tree, region)
         _get_bv_resorces(bv_client,tree,region)
 
-    for r in conf._compartments_tree.keys():
+    for r in conf.compartments_tree.keys():
         #logging.info(r)
         conf.workon_region = r
         logging.info("visit compartments in {} region".format(r))
@@ -83,20 +85,22 @@ def resource_list(conf:OCIConfig):
         network_client = oci.core.VirtualNetworkClient(conf.config)
         bv_client = oci.core.BlockstorageClient(conf.config)
 
-        #bv_client.list_volumes('').data
+        # bv_client.list_volumes('').data
         
-        _retrieve_resources_in_compartment(conf._compartments_tree[r],r)
+        _retrieve_resources_in_compartment(conf.compartments_tree[r], r)
 
 
 def _get_instance_resources(compute_client,tree,region):
     """
     retrieve instances and vnics
     """
-    ilist = oci.pagination.list_call_get_all_results(compute_client.list_instances,compartment_id=tree['id'])
+    ilist = oci.pagination.list_call_get_all_results(compute_client.list_instances, compartment_id=tree['id'])
 
     def _get_nested_resources(api_list_call, res: OciResource):
         try:
-            rlist = oci.pagination.list_call_get_all_results(api_list_call,compartment_id=tree['id'], instance_id=i.id)
+            rlist = oci.pagination.list_call_get_all_results(api_list_call,
+                                                             compartment_id=tree['id'],
+                                                             instance_id=i.id)
             for r in rlist.data:
                 instance[res.resource_type] = res(r)
         except:
@@ -114,11 +118,13 @@ def _get_network_resources(network_client,tree,region):
     """
     retrieve: vcn, subnet, gateways, secury list, route tables
     """
-    ilist = oci.pagination.list_call_get_all_results(network_client.list_vcns,compartment_id=tree['id'])
+    ilist = oci.pagination.list_call_get_all_results(network_client.list_vcns, compartment_id=tree['id'])
 
     def _get_nested_resources(api_list_call, res: OciResource):
         try:
-            rlist = oci.pagination.list_call_get_all_results(api_list_call,compartment_id=tree['id'], vcn_id=vcn.id)
+            rlist = oci.pagination.list_call_get_all_results(api_list_call,
+                                                             compartment_id=tree['id'],
+                                                             vcn_id=vcn.id)
             for r in rlist.data:
                 vcn[res.resource_type] = res(r)
         except:
@@ -142,11 +148,13 @@ def _get_bv_resorces(bv_client,tree,region):
     """
     retrieve block volumes
     """
-    ilist = oci.pagination.list_call_get_all_results(bv_client.list_volumes,compartment_id=tree['id'])
+    ilist = oci.pagination.list_call_get_all_results(bv_client.list_volumes, compartment_id=tree['id'])
 
     def _get_nested_resources(api_list_call, res: OciResource):
         try:
-            rlist = oci.pagination.list_call_get_all_results(api_list_call,compartment_id=tree['id'], vcn_id=i.id)
+            rlist = oci.pagination.list_call_get_all_results(api_list_call,
+                                                             compartment_id=tree['id'],
+                                                             vcn_id=i.id)
             for r in rlist.data:
                 bv[res.resource_type] = res(r)
         except:
@@ -155,7 +163,7 @@ def _get_bv_resorces(bv_client,tree,region):
     for i in ilist.data:
         bv = OciBlockVolume(i)
 
-        #_get_nested_resources(bv_client..., ...)
+        # _get_nested_resources(bv_client..., ...)
 
         tree.setdefault(bv.resource_type, []).append(bv)
 

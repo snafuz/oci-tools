@@ -3,9 +3,9 @@ import oci
 
 class OCIConfig:
 
-    def __init__(self, config_path=None,**kwargs):    
-        self._compartments_tree=None
-        self._workon_region=None
+    def __init__(self, config_path=None, **kwargs):
+        self._compartments_tree = None
+        self._workon_region = None
 
         self._config = oci.config.from_file(config_path)
                 
@@ -13,21 +13,25 @@ class OCIConfig:
             self.regions=self._config['regions']
         
         for key,value in self._config.items():
-            if value != None:
-                setattr(self, key, value.split(',') if isinstance(value,str) and ',' in value else value)
+            if value:
+                setattr(self, key, value.split(',') if isinstance(value, str) and ',' in value else value)
 
-        #set the value from command line
-        #note that it ovewrite config file value
+        # set the value from command line
+        # note that it overwrite config file value
         for key,value in kwargs.items():
-            if value != None:
-                setattr(self, key, value.split(',') if isinstance(value,str) and ',' in value else value)
+            if value :
+                setattr(self, key, value.split(',') if isinstance(value, str) and ',' in value else value)
+
+    @property
+    def tenancy(self):
+        return self.tenancy
 
     @property    
     def compartments_scope(self):
         """
         compartment list to work with
         """
-        return self.compartment if hasattr(self,'compartment') and self.compartment else self.tenancy
+        return self.compartment if hasattr(self, 'compartment') and self.compartment else self.tenancy
     
     @property
     def compartments_tree(self):
@@ -46,7 +50,6 @@ class OCIConfig:
         if 'region' not in self._config:
             self._config['region']=None
         return self._config['region']
-    
 
     @workon_region.setter
     def workon_region(self,region):
@@ -54,11 +57,3 @@ class OCIConfig:
         region currently in use
         """
         self._config['region']=region
-        
-    
-    
-
-    
-
-
-    
