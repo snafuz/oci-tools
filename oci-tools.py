@@ -16,7 +16,8 @@ def training(args):
     Entry point for the oci training toolkit
     """
     conf = oci_config.OCIConfig(args.config, regions=args.regions)
-    training_tools.scan_tenancy(conf)
+
+    training_tools.run(conf)
 
 
 def setup_log(args):

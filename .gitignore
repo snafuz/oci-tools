@@ -9,7 +9,7 @@ dist/
 .idea/
 
 # config file
-config
+config/config
 # version file
 .bumpversion.cfg
 

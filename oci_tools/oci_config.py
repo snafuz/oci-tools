@@ -76,3 +76,7 @@ class OCIConfig:
     @property
     def vcn_filter(self):
         return self._config_vcn_filter if hasattr(self, '_config_vcn_filter') and self._config_vcn_filter else None
+
+    @property
+    def operation(self):
+        return self._config_operation if hasattr(self, '_config_operation') and self._config_operation else 'list'

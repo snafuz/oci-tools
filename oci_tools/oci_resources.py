@@ -49,13 +49,15 @@ class OciResource(dict):
         :param id: resource OCID
         :param res_type: resource type
         """
-        super().__init__({'name':name, 'id':id, 'nested':[]})
+        super().__init__({'name': name, 'id': id, 'nested': []})
         self._name = name
         self._id = id
         self._resource=res
         self._nested_resources=[]
         self.resource_type = res_type
         self._api_client = api_client
+        self._status = res.lifecycle_state
+        self._compartment = res.compartment_id
         _registry.append(self._id, self)
 
     def __setitem__(self, key, value):
@@ -75,17 +77,26 @@ class OciResource(dict):
         """
         return nested resources in json format
         """
-        return  self._nested_resources
+        return self._nested_resources
 
     @property
     def id(self):
         return self._id
+
+    @property
+    def status(self):
+        return self.status
+
+    @property
+    def compartment(self):
+        return self.compartment
 
     def terminate(self, force=False):
         """
         delete the resources and all the nested resources
         """
         logging.info('Terminating resource {}'.format(self))
+
         self._terminate(force)
 
     def _terminate(self, force=False):
@@ -99,17 +110,33 @@ class OciResource(dict):
 ####################################
 # Resource definitions
 ####################################
+class OciCompartment(OciResource):
+
+    resource_type = 'compartment'
+
+    def __init__(self, res, api_client=None):
+        super().__init__(res,
+                         api_client=api_client,
+                         name=res.name,
+                         id=res.id)
+
+    def _terminate(self, force=False):
+        pass
+
+
 class OciInstance(OciResource):
 
     resource_type = 'instance'
 
-    def __init__(self,res, api_client=None):
+    def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id)
 
     def _terminate(self, force=False):
+
+        if self._status == 'TERMINATED': return
 
         # attached vnics are automatically detached and terminated
         try:
@@ -118,6 +145,7 @@ class OciInstance(OciResource):
                            self._api_client.get_instance(self.id),
                            'lifecycle_state',
                            'TERMINATED')
+            self._status = 'TERMINATED'
         except:
             logging.error('unable to terminate the instance {}'.format(self.id))
 
@@ -133,6 +161,8 @@ class OciVnic(OciResource):
                          id=res.id)
 
     def _terminate(self, force=False):
+        if force:
+            a = self.nested_resources
         pass
 
 
@@ -191,6 +221,7 @@ class OciInternetGw(OciResource):
                          id=res.id)
 
     def _terminate(self, force=False):
+        return
         try:
             self._api_client.delete_internet_gateway(self.id)
         except:

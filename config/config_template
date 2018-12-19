@@ -1,0 +1,19 @@
+[DEFAULT]
+user=
+fingerprint=
+key_file=
+tenancy=
+
+########################
+#comma separated region to work on
+#region_filter=eu-frankfurt-1,uk-london-1
+
+#list, delete, force-delete
+operation=list
+#operation=delete
+
+#comma separated compartment OCID to work on
+#compartment_flter=
+
+
+
