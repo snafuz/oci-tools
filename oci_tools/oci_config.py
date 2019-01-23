@@ -67,16 +67,27 @@ class OCIConfig:
 
     @property
     def region_filter(self):
-        return self._config_region_filter if hasattr(self, '_config_region_filter') and self._config_region_filter else None
+        if hasattr(self, '_config_region_filter'):
+            return self._config_region_filter if isinstance(self._config_region_filter,list) else [self._config_region_filter]
+        return None
 
     @property
     def compartment_filter(self):
-        return self._config_compartment_filter if hasattr(self,'_config_compartment_filter') and self._config_compartment_filter else None
+        if hasattr(self, '_config_compartment_filter'):
+            return self._config_compartment_filter if isinstance(self._config_compartment_filter,list) else [self._config_compartment_filter]
+        return None
 
     @property
     def vcn_filter(self):
-        return self._config_vcn_filter if hasattr(self, '_config_vcn_filter') and self._config_vcn_filter else None
+        if hasattr(self, '_config_vcn_filter'):
+            return self._config_vcn_filter if isinstance(self._config_vcn_filter,list) else [self._config_vcn_filter]
+        return None
 
     @property
     def operation(self):
+        """
+        set list as default operation
+
+        :return: operation
+        """
         return self._config_operation if hasattr(self, '_config_operation') and self._config_operation else 'list'

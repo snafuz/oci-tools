@@ -7,3 +7,8 @@ __maintainer__ = "amarchesini"
 __email__ = "andrea.marchesini@oracle.com"
 __status__ = "dev"
 __description__=""
+
+
+LIFECYCLE_KO_STATUS =['TERMINATED',
+                      'TERMINATING',
+                      'DETACHED']
