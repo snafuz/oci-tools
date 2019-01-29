@@ -84,6 +84,16 @@ class OCIConfig:
         return None
 
     @property
+    def simulate_deletion(self):
+        try:
+            if hasattr(self, '_config_simulate_deletion'):
+                if self._config_simulate_deletion and self._config_simulate_deletion.lower() == 'true':
+                    return True
+        except:
+            pass
+        return False
+
+    @property
     def operation(self):
         """
         set list as default operation

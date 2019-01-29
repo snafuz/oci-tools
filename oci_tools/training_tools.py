@@ -4,13 +4,14 @@ from pprint import pformat
 from .oci_config import OCIConfig
 from .oci_resources import *
 
-
+from oci_tools import RESOURCE as R
 
 
 compute_client: oci.core.ComputeClient = None
 network_client: oci.core.VirtualNetworkClient = None
 bv_client: oci.core.BlockstorageClient = None
-identity_client : oci.identity.IdentityClient = None
+identity_client: oci.identity.IdentityClient = None
+
 
 
 def run(config: OCIConfig):
@@ -77,7 +78,7 @@ def compartment_tree_build(conf: OCIConfig):
         try:
             rlist = oci.pagination.list_call_get_all_results(api_list_call, item.id)
             for r in rlist.data:
-                res_obj = res(r)
+                res_obj = res(r, identity_client)
                 compartment.append(res_obj)
 
         except Exception as e:
@@ -85,7 +86,9 @@ def compartment_tree_build(conf: OCIConfig):
             logging.debug(e)
 
     for item in elems.data:
-        compartment = OciCompartment(item)
+        compartment = OciCompartment(item, identity_client)
+        if not compartment.is_active():
+            continue
         tree.append(compartment)
         _get_nested_resources(identity_client.list_compartments, OciCompartment)
 
@@ -103,7 +106,7 @@ def resource_list(conf: OCIConfig):
     def _retrieve_resources_in_compartment(tree, region, traverse_level=1):
         
         logging.info('{} {}'.format('__'*traverse_level, tree['name']))
-        items = tree.get('compartment')
+        items = tree.get(R.COMPARTMENT)
         for nested_item in [] if not items else items:
             traverse_level += 1
             _retrieve_resources_in_compartment(nested_item, region, traverse_level)
@@ -146,7 +149,7 @@ def _get_instance_resources(tree: OciResource, region, conf: OCIConfig):
                                                              compartment_id=tree['id'],
                                                              instance_id=i.id)
             for r in rlist.data:
-                res_obj = res(r)
+                res_obj = res(r, compute_client)
                 if not res_obj or not res_obj.is_active():
                     continue
                 instance.append(res_obj)
@@ -165,8 +168,9 @@ def _get_instance_resources(tree: OciResource, region, conf: OCIConfig):
             logging.error('unable to retrieve {} in [{}] Instance {}'.format(res.resource_type, region, i.id))
 
     for i in ilist.data:
-        instance = OciInstance(i)
-
+        instance = OciInstance(i, compute_client)
+        if not instance.is_active():
+            continue
         _get_nested_resources(compute_client.list_vnic_attachments, OciVnicAttachment)
 
         tree.append(instance)
@@ -189,7 +193,7 @@ def _get_network_resources(tree, region, conf: OCIConfig):
                                                              compartment_id=tree['id'],
                                                              vcn_id=vcn.id)
             for r in rlist.data:
-                res_obj = res(r)
+                res_obj = res(r, network_client)
                 if not res_obj or not res_obj.is_active():
                     continue
                 vcn.append(res_obj)
@@ -197,7 +201,7 @@ def _get_network_resources(tree, region, conf: OCIConfig):
             logging.error('unable to retrieve {} in [{}] VCN {}'.format(res.resource_type, region, vcn.id))
 
     for i in ilist.data:
-        vcn = OciVcn(i)
+        vcn = OciVcn(i, network_client)
         _get_nested_resources(network_client.list_subnets, OciSubnet)
         _get_nested_resources(network_client.list_internet_gateways, OciInternetGw)
         _get_nested_resources(network_client.list_nat_gateways, OciNatGw)
@@ -219,26 +223,31 @@ def _get_bv_resources(tree, region, conf: OCIConfig):
     :param conf: OCIConfig object
     """
 
-    ilist = oci.pagination.list_call_get_all_results(bv_client.list_volumes, compartment_id=tree['id'])
+    try:
+        ilist = oci.pagination.list_call_get_all_results(bv_client.list_volumes, compartment_id=tree['id'])
 
-    def _get_nested_resources(api_list_call, res: OciResource):
-        try:
-            rlist = oci.pagination.list_call_get_all_results(api_list_call,
-                                                             compartment_id=tree['id'],
-                                                             vcn_id=i.id)
-            for r in rlist.data:
-                if not res_obj or not res_obj.is_active():
-                    continue
-                bv.setdefault(res_obj.resource_type, []).append(res_obj)
-        except:
-            logging.error('unable to retrieve {} in [{}] Instance {}'.format(res.resource_type, region, i.id))
+        def _get_nested_resources(api_list_call, res: OciResource):
+            try:
+                rlist = oci.pagination.list_call_get_all_results(api_list_call,
+                                                                 compartment_id=tree['id'],
+                                                                 vcn_id=i.id)
+                for r in rlist.data:
+                    res_obj = res(r, bv_client)
+                    if not res_obj or not res_obj.is_active():
+                        continue
+                    bv.setdefault(res_obj.resource_type, []).append(res_obj)
+            except:
+                logging.error('unable to retrieve {} in [{}] Block Volume {}'.format(res.resource_type, region, i.id))
 
-    for i in ilist.data:
-        bv = OciBlockVolume(i)
+        for i in ilist.data:
+            bv = OciBlockVolume(i, bv_client)
 
-        # _get_nested_resources(bv_client..., ...)
+            # _get_nested_resources(bv_client..., ...)
 
-        tree.setdefault(bv.resource_type, []).append(bv)
+            tree.setdefault(bv.resource_type, []).append(bv)
+    except Exception as e:
+        logging.error('error while retrieving Block Volume resources')
+        pass
 
 
 def _terminate_resources(conf: OCIConfig):
@@ -250,29 +259,10 @@ def _terminate_resources(conf: OCIConfig):
     :param conf: OCIConfig object
     """
 
-    def _retrieve_resources_in_compartment(tree, region, traverse_level=0):
-
-        logging.info('{} {}'.format('__' * traverse_level, tree['name']))
-        if 'nested' in tree:
-            for nested_item in tree['nested']:
-                traverse_level += 1
-                _retrieve_resources_in_compartment(nested_item['compartment'], region, traverse_level)
-                traverse_level -= 1
-        _get_instance_resources(compute_client, tree, region, conf)
-        _get_network_resources(network_client, tree, region)
-        _get_bv_resources(bv_client, tree, region)
-
-    global compute_client
-    global network_client
-    global bv_client
-
     for r in conf.compartments_tree.keys():
         # logging.info(r)
         conf.workon_region = r
-        logging.info("visit compartments in {} region".format(r))
+        logging.info("Clean-up resources in {} region".format(r))
 
-        compute_client = oci.core.ComputeClient(conf.config)
-        network_client = oci.core.VirtualNetworkClient(conf.config)
-        # bv_client = oci.core.BlockstorageClient(conf.config)
-
-        _retrieve_resources_in_compartment(conf.compartments_tree[r], r)
+        for tree in conf.compartments_tree[r]:
+            tree.cleanup(simulate=conf.simulate_deletion, compartment_filter=conf.compartment_filter)
