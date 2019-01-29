@@ -8,12 +8,16 @@ tenancy=
 #comma separated region to work on
 #region_filter=eu-frankfurt-1,uk-london-1
 
-#list, delete, force-delete
+#list, delete
 operation=list
 #operation=delete
 
-#comma separated compartment OCID to work on
+#comma separated compartment OCID to cleanup
+#if empty all the compartment are terminated
 #compartment_flter=
+
+#simulate the cleanup without affect any resource
+#simulate_deletion=true
 
 
 
