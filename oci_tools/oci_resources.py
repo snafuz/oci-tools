@@ -1,14 +1,14 @@
-import logging
+import logging, time
 import oci
 from oci.core import *
+from oci.load_balancer import *
 
-from oci_tools import LIFECYCLE_KO_STATUS, RESOURCE as R
-
+from oci_tools import LIFECYCLE_KO_STATUS, LIFECYCLE_INACTIVE_STATUS, RESOURCE as R
 
 
 class _Registry:
     """
-    helper class to keep track of the inner dependency not inferable via compartment scanning
+    helper class to keep track of the inner dependencies not inferable via compartment scanning
     It contains a flat dict with all the resources.
     """
 
@@ -108,19 +108,20 @@ class OciResource(dict):
         return self._resource_type
 
     def is_active(self):
-        return self.lifecycle_state not in LIFECYCLE_KO_STATUS
+        return self.lifecycle_state not in LIFECYCLE_INACTIVE_STATUS
 
     def terminate(self, force=False, simulate=False):
         """
         delete the resources and all the nested resources
         """
+        logging.info(':: Terminating {} {} [{}]'.format(self.resource_type, self.name, self.id))
         #logging.info('Terminating resource {}'.format(self))
         if self._terminate(force, simulate):
-            logging.info(':: {} terminated [{}]'.format(self.resource_type, self.id))
+            logging.info(':: {} {} terminated [{}]'.format(self.resource_type,self.name, self.id))
         else:
             logging.error(':: unable to terminate {} {} {}'.format(self.resource_type, self.name, self.id))
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self, force=False, simulate=False, **kwargs):
         """
         internal Terminate implementation
         Child classes should override this method
@@ -133,6 +134,8 @@ class OciResource(dict):
 ####################################
 # Resource definitions
 ####################################
+
+
 class OciCompartment(OciResource):
 
     def __init__(self, res, api_client=None):
@@ -142,14 +145,25 @@ class OciCompartment(OciResource):
                          id=res.id,
                          res_type=R.COMPARTMENT)
 
-    def cleanup(self, force=True, preserve_sub_compartment=False, simulate=False, compartment_filter=None):
+    def cleanup(self, force=True,
+                preserve_compartments=False,
+                preserve_top_level_compartment=False,
+                simulate=False,
+                compartment_filter=None):
         """
-        Clean up resource in a compartment
+        Clean up resource in a compartment.
+
+        ****IMPORTANT*****
+        compartments can be delete only if:
+            1 - empty in every regions
+            2 - the script is running against home region API
 
         :param force: force termination of all the nested resources
-        :param preserve_sub_compartment: if true doesn't terminate the sub-compartment
+        :param preserve_compartments: if true doesn't terminate the sub-compartment
         :param simulate: simulate termination/cleanup process without affect any resource
         :param compartment_filter: list of compartment to be terminated
+        :param preserve_top_level_compartment: if true don't delete the top level compartments
+        in case compartment_filter is used then the compartments specified will be the top level compartments
         :return:
         """
 
@@ -157,17 +171,19 @@ class OciCompartment(OciResource):
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
             return False
 
-
-
+        # preserve the compartment if the filter is not empty and the compartment is not listed
         preserve = bool(compartment_filter) and self.name not in compartment_filter
 
         items = self.get(R.COMPARTMENT)
         for nested in [] if not items else items:
-            if preserve or preserve_sub_compartment:
-                nested.cleanup(simulate=simulate, compartment_filter=compartment_filter)
-            else:
-                nested.terminate(force, simulate)
 
+            nested.cleanup(simulate=simulate,
+                           preserve_compartments=preserve_compartments,
+                           preserve_top_level_compartment=preserve and preserve_top_level_compartment,
+                           #if the current compartment is going to be delete, don't pass the filter to subcompartment
+                           compartment_filter=compartment_filter if preserve or preserve_compartments else None)
+
+        # if preserve don't cleanup the resources
         if preserve:
             logging.info('::: skip compartment {}'.format(self.name))
             return
@@ -178,19 +194,21 @@ class OciCompartment(OciResource):
         for nested in [] if not items else items:
             nested.terminate(force, simulate)
 
+        items = self.get(R.LB)
+        for nested in [] if not items else items:
+            nested.terminate(force, simulate)
+
         items = self.get(R.VCN)
         for nested in [] if not items else items:
             nested.terminate(force, simulate)
 
+        if not preserve_compartments and not preserve_top_level_compartment:
+            self.terminate(simulate=simulate)
+            logging.info('::: terminate {}'.format(self.name))
+
         return True
 
-    def _terminate(self, force=False, simulate=False, filter=None):
-
-        if not self.is_active():
-            logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
-            return
-
-        self.cleanup(simulate=simulate)
+    def _terminate(self, force=False, simulate=False):
 
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
@@ -200,7 +218,6 @@ class OciCompartment(OciResource):
             return True
 
         try:
-
             oci.identity.IdentityClientCompositeOperations(self._api_client)\
                 .delete_compartment_and_wait_for_state(self.id, LIFECYCLE_KO_STATUS)
             self._status = 'DELETED'
@@ -233,12 +250,12 @@ class OciInstance(OciResource):
 
         # attached vnics are automatically detached and terminated
         try:
+            # if force the boot volume is deleted
             oci.core.ComputeClientCompositeOperations(
                 self._api_client
             ).terminate_instance_and_wait_for_state(self.id,
                                                     LIFECYCLE_KO_STATUS,
                                                     {'preserve_boot_volume': (not force)})
-
             self._status = 'TERMINATED'
             return True
         except oci.exceptions.ServiceError as se:
@@ -279,7 +296,7 @@ class OciVcn(OciResource):
     def _terminate(self, force=False, simulate=False):
 
         if force:
-            # !! the below order is critical to be able to terminate all the resources
+            # *** the below order is critical to avoid dependency issues ***
             items = self.get(R.SUBNET)
             for nested in [] if not items else items:
                 nested.terminate(force, simulate)
@@ -312,7 +329,6 @@ class OciVcn(OciResource):
             return True
 
         try:
-
             oci.core.VirtualNetworkClientCompositeOperations(self._api_client)\
                 .delete_vcn_and_wait_for_state(self.id, LIFECYCLE_KO_STATUS)
             self._status = 'TERMINATED'
@@ -526,7 +542,6 @@ class OciLocalPeeringGw(OciResource):
 
 class OciSecurityList(OciResource):
 
-
     def __init__(self, res, api_client:VirtualNetworkClient=None):
         super().__init__(res,
                          api_client=api_client,
@@ -553,7 +568,7 @@ class OciSecurityList(OciResource):
             self._status = 'TERMINATED'
             return  True
         except oci.exceptions.ServiceError as se:
-            #If it is the default SL can't be deleted
+            # the default SL can't be deleted
             if se.code == 'IncorrectState' and se.status==409:
                 return True
             logging.error(se.message)
@@ -591,7 +606,7 @@ class OciRouteTable(OciResource):
             self._status = 'TERMINATED'
             return True
         except oci.exceptions.ServiceError as se:
-            # If it is the default RT can't be deleted and need to cleanup all the route rules
+            # the default RT can't be deleted --> cleanup all the route rules
             if se.code == 'IncorrectState' and se.status == 409:
                 return self.cleanup()
             logging.error(se.message)
@@ -607,6 +622,7 @@ class OciRouteTable(OciResource):
         except oci.exceptions.ServiceError as se:
             logging.error(se.message)
             return False
+
 
 class OciBlockVolume(OciResource):
 
@@ -660,6 +676,48 @@ class OciVnic(OciResource):
             oci.core.VirtualNetworkClientCompositeOperations(self._api_client)\
                 .detach_vnic_and_wait_for_state(self.id, LIFECYCLE_KO_STATUS)
             self._status = 'TERMINATED'
+            return True
+        except oci.exceptions.ServiceError as se:
+            logging.error(se.message)
+            return False
+        except Exception as e:
+            logging.error(str(e))
+            return False
+
+
+class OciLoadBalancer(OciResource):
+
+    def __init__(self, res, api_client:LoadBalancerClient=None):
+        super().__init__(res,
+                         api_client=api_client,
+                         name=res.display_name,
+                         id=res.id,
+                         res_type=R.LB)
+
+    def _terminate(self, force=False, simulate=False):
+        if not self.is_active():
+            logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
+            return False
+
+        if simulate:
+            return True
+
+        try:
+            # waiter function doesn't work, so I'm checking manually the lifecycle of the resource
+            # if ServiceError.404 is returned then the resource has been deleted
+            self._api_client.delete_load_balancer(self.id)
+            while True:
+                time.sleep(3)
+                logging.info('checking lb status')
+                try:
+                    tmp = self._api_client.get_load_balancer(self.id)
+                    if tmp and tmp.data.lifecycle_state in LIFECYCLE_KO_STATUS:
+                        break
+                except oci.exceptions.ServiceError as se:
+                    if se.status == 404:
+                        break
+                    raise se
+            self._status = 'DELETED'
             return True
         except oci.exceptions.ServiceError as se:
             logging.error(se.message)

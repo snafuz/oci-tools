@@ -40,7 +40,7 @@ Run the server
     #enter in virtual env
     $ . venv_oci-tools/bin/activate
 
-    (venv_oci-tools) $ python oci-tools.py 
+    (venv_oci-tools) $ python oci-tools.py training 
 ```
 
 

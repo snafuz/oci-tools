@@ -8,13 +8,25 @@ tenancy=
 #comma separated region to work on
 #region_filter=eu-frankfurt-1,uk-london-1
 
-#list, delete
-operation=list
+#available operation:
+# - list: scan the tenancy and list all the resources
+# - cleanup: delete all but toplevel compartments
+# - delete: delete all
+#operation=list
 #operation=delete
+operation=cleanup
 
 #comma separated compartment OCID to cleanup
 #if empty all the compartment are terminated
 #compartment_flter=
+
+# if true don't delete the top level compartments
+# in case compartment_filter is used then the compartments specified will be the top level compartments
+preserve_top_level_compartment=true
+
+# Preserve the compartment structure
+preserve_compartments=true
+
 
 #simulate the cleanup without affect any resource
 #simulate_deletion=true

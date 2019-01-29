@@ -87,8 +87,7 @@ class OCIConfig:
     def simulate_deletion(self):
         try:
             if hasattr(self, '_config_simulate_deletion'):
-                if self._config_simulate_deletion and self._config_simulate_deletion.lower() == 'true':
-                    return True
+                return self._config_simulate_deletion and self._config_simulate_deletion.lower() == 'true'
         except:
             pass
         return False
@@ -101,3 +100,25 @@ class OCIConfig:
         :return: operation
         """
         return self._config_operation if hasattr(self, '_config_operation') and self._config_operation else 'list'
+
+    @property
+    def preserve_top_level_compartment(self):
+        """
+        specify if the top level compartment need to be preserved
+        :return: configuratino value of preserve_top_level_compartment
+        """
+        if hasattr(self, '_config_preserve_top_level_compartment'):
+            return self._config_preserve_top_level_compartment and self._config_preserve_top_level_compartment.lower() == 'true'
+        else:
+            return False
+
+    @property
+    def preserve_compartments(self):
+        """
+        specify if the compartments structure need to be preserved
+        :return: configuration value of preserve_commpartment
+        """
+        if hasattr(self, '_config_preserve_compartments'):
+            return self._config_preserve_compartments and self._config_preserve_compartments.lower() == 'true'
+        else:
+            return False

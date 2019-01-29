@@ -12,6 +12,7 @@ __description__=""
 
 from collections import namedtuple
 
+# resource name identifier
 RESOURCE = namedtuple('RESOURCES',
                        'VCN '
                        'INSTANCE '
@@ -26,7 +27,8 @@ RESOURCE = namedtuple('RESOURCES',
                        'SERVICEGW '
                        'SEC_LIST '
                        'ROUTE_TABLE '
-                       'LPEERINGGW')\
+                       'LPEERINGGW '
+                        'LB ')\
     ('vcn',
      'instance',
      'compartment',
@@ -40,10 +42,14 @@ RESOURCE = namedtuple('RESOURCES',
      'sgw',
      'sl',
      'rt',
-     'lpg')
+     'lpg',
+     'lb')
+
 
 LIFECYCLE_KO_STATUS =['TERMINATED',
-                      'TERMINATING',
                       'DETACHED',
                       'DELETED']
+
+LIFECYCLE_INACTIVE_STATUS = ['TERMINATING',
+                             'DELETING'] + LIFECYCLE_KO_STATUS
 

@@ -65,14 +65,16 @@ sub01 = parser.add_subparsers(help="OCI toolkit")
 training_parser = sub01.add_parser('training',
                                    help="utility to manage training environments")
 training_parser.set_defaults(func=training)
-training_parser.add_argument('-o', '--operation',
-                             dest='operation',
-                             default='list',
-                             choices=['list', 'delete'])
 training_parser.add_argument('--config',
                              help='OCI configuration file',
                              dest='config',
                              default='./config/config')
+# WARNING below parameters are not yet managed in the code
+# USE CONFIG FILE
+training_parser.add_argument('-o', '--operation',
+                             dest='operation',
+                             default='list',
+                             choices=['list', 'delete'])
 training_parser.add_argument('--regions',
                              help='comma separated list of regions',
                              dest='regions')
