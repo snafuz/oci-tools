@@ -2,23 +2,26 @@
 
 ## Introduction
 
-Python Tenancy Manager
+Python OCI Resource Manager
 
 ## Installation
 
 * Setup a virtualenv and install the dependencies.
+* ***The script requires python 3***
 
 ```bash
     $ git clone https://github.com/snafuz/oci-tools.git
     $ cd oci-tools
 
-    $ pip install virtualenv
+    $ pip3 install virtualenv
     $ virtualenv venv_oci-tools
     $ . venv_oci-tools/bin/activate
 
-    (venv_oci-tools) $ pip install -r requirements.txt
+    (venv_oci-tools) $ pip3 install -r requirements.txt
 
 ```
+
+[Here](docs/ol_linux_setup.md) the Oracle Linux OCI instance setup
 
 * Prepare configuration file:
 
@@ -37,11 +40,20 @@ Training toolkit
 
 Run the server
 ```bash
-    #enter in virtual env
+    #enter in virtualenv
     $ . venv_oci-tools/bin/activate
 
-    (venv_oci-tools) $ python oci-tools.py training 
+    (venv_oci-tools) $ python3 oci-tools.py resource-manager 
 ```
+
+### Caveats
+* The script currently manage the below resources
+    * Compute
+    * VCN (subnet, security list, route table, internet gateway, NAT gateway, local peering gateway, service gateway)
+    * Block volume
+    * Load Balancer
+* The compartment can be deleted only from the home region
+* The cleanup process currently doesn't support cross-compartment dependencies
 
 
 

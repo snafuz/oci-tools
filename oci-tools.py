@@ -19,6 +19,15 @@ def training(args):
 
     training_tools.run(conf)
 
+def resource_manager(args):
+    """
+        Entry point for the oci resource manager
+        """
+    conf = oci_config.OCIConfig(args.config, regions=args.regions)
+
+    training_tools.run(conf)
+
+
 
 def setup_log(args):
     """
@@ -69,22 +78,36 @@ training_parser.add_argument('--config',
                              help='OCI configuration file',
                              dest='config',
                              default='./config/config')
-# WARNING below parameters are not yet managed in the code
-# USE CONFIG FILE
-training_parser.add_argument('-o', '--operation',
-                             dest='operation',
-                             default='list',
-                             choices=['list', 'delete'])
 training_parser.add_argument('--regions',
                              help='comma separated list of regions',
                              dest='regions')
-training_parser.add_argument('-f', '--force',
+    
+resource_manager_parser = sub01.add_parser('resource-manager',
+                                   help="utility to manage oci environments")
+resource_manager_parser.set_defaults(func=resource_manager)
+resource_manager_parser.add_argument('--config',
+                             help='OCI configuration file',
+                             dest='config',
+                             default='./config/config')
+# WARNING below parameters are not yet managed in the code
+# USE CONFIG FILE
+resource_manager_parser.add_argument('-o', '--operation',
+                             dest='operation',
+                             default='list',
+                             choices=['list', 'delete'])
+resource_manager_parser.add_argument('--regions',
+                             help='comma separated list of regions',
+                             dest='regions')
+resource_manager_parser.add_argument('-f', '--force',
                              help='force the delete operation without asking for confirmation',
                              default=False,
                              dest='clean_force')
-    
- 
+
+
 def main():
+    import sys
+    if sys.version_info[0] < 3:
+        raise Exception("I'm sorry, you're Python version must be >= 3")
     args=parser.parse_args()
     setup_log(args)
     args.func(args)
