@@ -11,7 +11,7 @@ tenancy=
 #available operation:
 # - list: scan the tenancy and list all the resources
 # - cleanup: delete all but toplevel compartments
-# - delete: delete all
+# - delete: delete all (currently = cleanup
 #operation=list
 #operation=delete
 operation=cleanup
@@ -31,5 +31,13 @@ preserve_compartments=true
 #simulate the cleanup without affect any resource
 #simulate_deletion=true
 
+
+# comma separated list of compartments to keep safe
+#preserve_compartments=
+
+# commas separated list of tag to keep safe
+# freeform tags must be inserted it the following format: key=value or key
+# defined tags must be inserted in the following format: namespace:key=value
+preserve_tags=training.foundation=true,safe=true,not_delete
 
 

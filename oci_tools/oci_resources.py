@@ -2,8 +2,10 @@ import logging, time
 import oci
 from oci.core import *
 from oci.load_balancer import *
+from oci.database import *
 
-from oci_tools import LIFECYCLE_KO_STATUS, LIFECYCLE_INACTIVE_STATUS, RESOURCE as R
+from . import LIFECYCLE_KO_STATUS, LIFECYCLE_INACTIVE_STATUS, RESOURCE as R
+from .oci_config import OCIConfig
 
 
 class _Registry:
@@ -23,8 +25,6 @@ class _Registry:
 
 
 _registry = _Registry()
-
-
 
 
 class OciResource(dict):
@@ -59,10 +59,9 @@ class OciResource(dict):
         self._resource=res
         self._resource_type = res_type
         self._api_client = api_client
-        self._lifecycle_state = res.lifecycle_state
+        self._lifecycle_state = res.lifecycle_state if hasattr(res, 'lifecycle_state') else ''
         self._compartment = res.compartment_id
         _registry.append(self._id, self)
-
 
     @property
     def resource(self):
@@ -86,7 +85,6 @@ class OciResource(dict):
         """
         self.setdefault(res_obj.resource_type, []).append(res_obj)
 
-
     @property
     def id(self):
         return self._id
@@ -107,21 +105,33 @@ class OciResource(dict):
     def resource_type(self):
         return self._resource_type
 
+    @property
+    def defined_tags(self):
+        return self.resource.defined_tags if hasattr(self.resource, 'defined_tags') else {}
+
+    @property
+    def freeform_tags(self):
+        return self.resource.freeform_tags if hasattr(self.resource, 'freeform_tags') else {}
+
     def is_active(self):
         return self.lifecycle_state not in LIFECYCLE_INACTIVE_STATUS
 
-    def terminate(self, force=False, simulate=False):
+    def terminate(self,  simulate=False, preserve_tags={}, **kwargs):
         """
         delete the resources and all the nested resources
         """
+
+        if self._check_tags(preserve_tags):
+            logging.info('::: skip resource termination [tag] {}'.format(self.name))
+            return
+
         logging.info(':: Terminating {} {} [{}]'.format(self.resource_type, self.name, self.id))
-        #logging.info('Terminating resource {}'.format(self))
-        if self._terminate(force, simulate):
+        if self._terminate(simulate, preserve_tags, **kwargs):
             logging.info(':: {} {} terminated [{}]'.format(self.resource_type,self.name, self.id))
         else:
             logging.error(':: unable to terminate {} {} {}'.format(self.resource_type, self.name, self.id))
 
-    def _terminate(self, force=False, simulate=False, **kwargs):
+    def _terminate(self, simulate=False, preserve_tags={}, **kwargs):
         """
         internal Terminate implementation
         Child classes should override this method
@@ -131,11 +141,21 @@ class OciResource(dict):
     def _status(self):
         return self._lifecycle_state
 
+    def _check_tags(self, preserve_tags):
+        for val in preserve_tags['free-tags'].keys():
+            if self.freeform_tags.get(val) == preserve_tags['free-tags'].get(val):
+                return True
+
+        for ns in preserve_tags['defined-tags'].keys():
+            if ns in self.defined_tags:
+                for val in preserve_tags['defined-tags'].get(ns).keys():
+                    if self.defined_tags[ns].get(val) == preserve_tags['defined-tags'][ns].get(val):
+                        return True
+
+
 ####################################
 # Resource definitions
 ####################################
-
-
 class OciCompartment(OciResource):
 
     def __init__(self, res, api_client=None):
@@ -145,11 +165,11 @@ class OciCompartment(OciResource):
                          id=res.id,
                          res_type=R.COMPARTMENT)
 
-    def cleanup(self, force=True,
-                preserve_compartments=False,
-                preserve_top_level_compartment=False,
-                simulate=False,
-                compartment_filter=None):
+    def cleanup(self,
+                config: OCIConfig,
+                force=False,
+                **kwargs
+                ):
         """
         Clean up resource in a compartment.
 
@@ -158,30 +178,38 @@ class OciCompartment(OciResource):
             1 - empty in every regions
             2 - the script is running against home region API
 
-        :param force: force termination of all the nested resources
-        :param preserve_compartments: if true doesn't terminate the sub-compartment
-        :param simulate: simulate termination/cleanup process without affect any resource
-        :param compartment_filter: list of compartment to be terminated
-        :param preserve_top_level_compartment: if true don't delete the top level compartments
+        :param config: configuration object
+        :param force: force termination of all the resources in the compartment
         in case compartment_filter is used then the compartments specified will be the top level compartments
         :return:
         """
+
+        # if force then this is not a toplevel compartment
+        preserve_top_level_compartment = False if force else config.preserve_top_level_compartment
+
+        # if force then the compartment resources must be deleted and compartment_filter ignored
+        compartment_filter = None if force else config.compartment_filter
 
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
             return False
 
-        # preserve the compartment if the filter is not empty and the compartment is not listed
+        # skip the compartment if in preserve_compartments list or if it's tagged with the specified tags
+        if (config.preserve_compartments and self.name in config.preserve_compartments or
+                self._check_tags(config.preserve_tags)):
+            return
+
+        # preserve the compartment if the filter is not empty and the compartment is not in the list
+
         preserve = bool(compartment_filter) and self.name not in compartment_filter
 
         items = self.get(R.COMPARTMENT)
         for nested in [] if not items else items:
 
-            nested.cleanup(simulate=simulate,
-                           preserve_compartments=preserve_compartments,
-                           preserve_top_level_compartment=preserve and preserve_top_level_compartment,
-                           #if the current compartment is going to be delete, don't pass the filter to subcompartment
-                           compartment_filter=compartment_filter if preserve or preserve_compartments else None)
+            nested.cleanup(config=config,
+                           #if the current compartment is going to be delete, force = True
+                           force=force or not preserve,
+                           **kwargs)
 
         # if preserve don't cleanup the resources
         if preserve:
@@ -192,23 +220,52 @@ class OciCompartment(OciResource):
 
         items = self.get(R.INSTANCE)
         for nested in [] if not items else items:
-            nested.terminate(force, simulate)
+            nested.terminate(config.simulate_deletion, config.preserve_tags)
 
         items = self.get(R.LB)
         for nested in [] if not items else items:
-            nested.terminate(force, simulate)
+            nested.terminate(config.simulate_deletion, config.preserve_tags)
+        '''
+        items = self.get(R.DB)
+        for nested in [] if not items else items:
+            nested.terminate(config.simulate_deletion, config.preserve_tags)
+        '''
+        items = self.get(R.DRG_ATTACHMENT)
+        for nested in [] if not items else items:
+            nested.terminate(config.simulate_deletion, config.preserve_tags)
 
         items = self.get(R.VCN)
         for nested in [] if not items else items:
-            nested.terminate(force, simulate)
+            nested.terminate(config.simulate_deletion, config.preserve_tags)
 
-        if not preserve_compartments and not preserve_top_level_compartment:
-            self.terminate(simulate=simulate)
+        items = self.get(R.VPN)
+        for nested in [] if not items else items:
+            nested.terminate(config.simulate_deletion, config.preserve_tags)
+
+        items = self.get(R.CPE)
+        for nested in [] if not items else items:
+            nested.terminate(config.simulate_deletion, config.preserve_tags)
+
+        items = self.get(R.RPC)
+        for nested in [] if not items else items:
+            nested.terminate(config.simulate_deletion, config.preserve_tags)
+
+        items = self.get(R.DRG)
+        for nested in [] if not items else items:
+            nested.terminate(config.simulate_deletion, config.preserve_tags)
+        '''
+        items = self.get(R.DB_BACKUP)
+        for nested in [] if not items else items:
+            nested.terminate(config.simulate_deletion, config.preserve_tags)
+        '''
+
+        if not config.preserve_compartment_structure and not preserve_top_level_compartment:
+            self.terminate(config.simulate_deletion, config.preserve_tags)
             logging.info('::: terminate {}'.format(self.name))
 
         return True
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self, simulate=False, **kwargs):
 
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
@@ -239,7 +296,7 @@ class OciInstance(OciResource):
                          id=res.id,
                          res_type=R.INSTANCE)
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
 
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
@@ -250,12 +307,11 @@ class OciInstance(OciResource):
 
         # attached vnics are automatically detached and terminated
         try:
-            # if force the boot volume is deleted
             oci.core.ComputeClientCompositeOperations(
                 self._api_client
             ).terminate_instance_and_wait_for_state(self.id,
                                                     LIFECYCLE_KO_STATUS,
-                                                    {'preserve_boot_volume': (not force)})
+                                                    {'preserve_boot_volume': kwargs.pop('preserve_boot_volume', False)})
             self._status = 'TERMINATED'
             return True
         except oci.exceptions.ServiceError as se:
@@ -268,14 +324,14 @@ class OciInstance(OciResource):
 
 class OciVnicAttachment(OciResource):
 
-    def __init__(self,res, api_client=None):
+    def __init__(self, res, api_client=None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id,
                          res_type=R.VNIC_ATTACHMENT)
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
             return False
@@ -286,40 +342,40 @@ class OciVnicAttachment(OciResource):
 
 class OciVcn(OciResource):
 
-    def __init__(self, res, api_client:VirtualNetworkClient=None):
+    def __init__(self, res, api_client: VirtualNetworkClient = None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id,
                          res_type=R.VCN)
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
 
-        if force:
+        if not kwargs.pop('ignore_nested_resources', False):
             # *** the below order is critical to avoid dependency issues ***
             items = self.get(R.SUBNET)
             for nested in [] if not items else items:
-                nested.terminate(force, simulate)
+                nested.terminate(simulate, preserve_tags, **kwargs)
 
             items = self.get(R.SEC_LIST)
             for nested in [] if not items else items:
-                nested.terminate(force, simulate)
+                nested.terminate(simulate, preserve_tags, **kwargs)
 
             items = self.get(R.ROUTE_TABLE)
             for nested in [] if not items else items:
-                nested.terminate(force, simulate)
+                nested.terminate(simulate, preserve_tags, **kwargs)
 
             items = self.get(R.IGW)
             for nested in [] if not items else items:
-                nested.terminate(force, simulate)
+                nested.terminate(simulate, preserve_tags, **kwargs)
 
             items = self.get(R.LPEERINGGW)
             for nested in [] if not items else items:
-                nested.terminate(force, simulate)
+                nested.terminate(simulate, preserve_tags, **kwargs)
 
             items = self.get(R.NATGW)
             for nested in [] if not items else items:
-                nested.terminate(force, simulate)
+                nested.terminate(simulate, preserve_tags, **kwargs)
 
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
@@ -338,19 +394,19 @@ class OciVcn(OciResource):
             return False
         except Exception as e:
             logging.error(str(e))
-            return  False
+            return False
 
 
 class OciSubnet(OciResource):
 
-    def __init__(self, res, api_client:VirtualNetworkClient=None):
+    def __init__(self, res, api_client: VirtualNetworkClient = None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id,
                          res_type=R.SUBNET)
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
 
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
@@ -392,14 +448,14 @@ _subnet_registry = _SubnetRegistry()
 
 class OciInternetGw(OciResource):
 
-    def __init__(self, res, api_client:VirtualNetworkClient=None):
+    def __init__(self, res, api_client: VirtualNetworkClient = None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id,
                          res_type=R.IGW)
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
             return False
@@ -422,14 +478,14 @@ class OciInternetGw(OciResource):
 
 class OciNatGw(OciResource):
 
-    def __init__(self, res, api_client:VirtualNetworkClient=None):
+    def __init__(self, res, api_client: VirtualNetworkClient = None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id,
                          res_type=R.NATGW)
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
             return False
@@ -452,14 +508,14 @@ class OciNatGw(OciResource):
 
 class OciDRG(OciResource):
 
-    def __init__(self, res, api_client:VirtualNetworkClient=None):
+    def __init__(self, res, api_client: VirtualNetworkClient = None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id,
                          res_type=R.DRG)
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
             return False
@@ -479,17 +535,132 @@ class OciDRG(OciResource):
             logging.error(str(e))
             return False
 
+class OciDRGAttachment(OciResource):
+
+    def __init__(self, res, api_client: VirtualNetworkClient = None):
+        super().__init__(res,
+                         api_client=api_client,
+                         name=res.display_name,
+                         id=res.id,
+                         res_type=R.DRG_ATTACHMENT)
+
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
+        if not self.is_active():
+            logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
+            return False
+
+        if simulate:
+            return True
+
+        try:
+            oci.core.VirtualNetworkClientCompositeOperations(self._api_client) \
+                    .delete_drg_attachment_and_wait_for_state(self.id, LIFECYCLE_KO_STATUS)
+            return True
+        except oci.exceptions.ServiceError as se:
+            logging.error(se.message)
+            return False
+        except Exception as e:
+            logging.error(str(e))
+            return False
+
+class OciCPE(OciResource):
+
+    def __init__(self, res, api_client: VirtualNetworkClient = None):
+        super().__init__(res,
+                         api_client=api_client,
+                         name=res.display_name,
+                         id=res.id,
+                         res_type=R.CPE)
+
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
+        if not self.is_active():
+            logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
+            return False
+
+        if simulate:
+            return True
+
+        try:
+            self._api_client.delete_cpe(self.id)
+            self._status = 'TERMINATED'
+            return True
+        except oci.exceptions.ServiceError as se:
+            logging.error(se.message)
+            return False
+        except Exception as e:
+            logging.error(str(e))
+            return False
+
+class OciRPC(OciResource):
+
+    def __init__(self, res, api_client: VirtualNetworkClient = None):
+        super().__init__(res,
+                         api_client=api_client,
+                         name=res.display_name,
+                         id=res.id,
+                         res_type=R.RPC)
+
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
+        if not self.is_active():
+            logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
+            return False
+
+        if simulate:
+            return True
+
+        try:
+            oci.core.VirtualNetworkClientCompositeOperations(self._api_client)\
+                .delete_remote_peering_connection_and_wait_for_state(self.id, LIFECYCLE_KO_STATUS)
+            self._status = 'TERMINATED'
+            return True
+        except oci.exceptions.ServiceError as se:
+            logging.error(se.message)
+            return False
+        except Exception as e:
+            logging.error(str(e))
+            return False
+
+
+class OciVPN(OciResource):
+
+    def __init__(self, res, api_client: VirtualNetworkClient = None):
+        super().__init__(res,
+                         api_client=api_client,
+                         name=res.display_name,
+                         id=res.id,
+                         res_type=R.VPN)
+
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
+        if not self.is_active():
+            logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
+            return False
+
+        if simulate:
+            return True
+
+        try:
+            oci.core.VirtualNetworkClientCompositeOperations(self._api_client)\
+                .delete_ip_sec_connection_and_wait_for_state(self.id, LIFECYCLE_KO_STATUS)
+            self._status = 'TERMINATED'
+            return True
+        except oci.exceptions.ServiceError as se:
+            logging.error(se.message)
+            return False
+        except Exception as e:
+            logging.error(str(e))
+            return False
+
 
 class OciServiceGw(OciResource):
 
-    def __init__(self, res, api_client:VirtualNetworkClient=None):
+    def __init__(self, res, api_client: VirtualNetworkClient = None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id,
                          res_type=R.SERVICEGW)
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
             return False
@@ -512,14 +683,14 @@ class OciServiceGw(OciResource):
 
 class OciLocalPeeringGw(OciResource):
 
-    def __init__(self, res, api_client:VirtualNetworkClient=None):
+    def __init__(self, res, api_client: VirtualNetworkClient = None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id,
                          res_type=R.LPEERINGGW)
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
             return False
@@ -542,14 +713,14 @@ class OciLocalPeeringGw(OciResource):
 
 class OciSecurityList(OciResource):
 
-    def __init__(self, res, api_client:VirtualNetworkClient=None):
+    def __init__(self, res, api_client: VirtualNetworkClient = None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id,
                          res_type=R.SEC_LIST)
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
         """
             The default security list for a given VCN can't be deleted
         """
@@ -580,14 +751,14 @@ class OciSecurityList(OciResource):
 
 class OciRouteTable(OciResource):
 
-    def __init__(self, res, api_client:VirtualNetworkClient=None):
+    def __init__(self, res, api_client: VirtualNetworkClient = None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id,
                          res_type=R.ROUTE_TABLE)
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
         """
         The default route table for a given VCN can't be deleted but need to be emptied.
         """
@@ -626,14 +797,14 @@ class OciRouteTable(OciResource):
 
 class OciBlockVolume(OciResource):
 
-    def __init__(self, res, api_client:BlockstorageClient=None):
+    def __init__(self, res, api_client: BlockstorageClient = None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id,
                          res_type=R.BLOCKVOLUME)
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
 
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
@@ -657,14 +828,14 @@ class OciBlockVolume(OciResource):
 
 class OciVnic(OciResource):
 
-    def __init__(self, res, api_client:VirtualNetworkClient=None):
+    def __init__(self, res, api_client: VirtualNetworkClient = None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id,
                          res_type=R.VNIC)
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
             return False
@@ -687,14 +858,14 @@ class OciVnic(OciResource):
 
 class OciLoadBalancer(OciResource):
 
-    def __init__(self, res, api_client:LoadBalancerClient=None):
+    def __init__(self, res, api_client: LoadBalancerClient = None):
         super().__init__(res,
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id,
                          res_type=R.LB)
 
-    def _terminate(self, force=False, simulate=False):
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
         if not self.is_active():
             logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
             return False
@@ -717,6 +888,66 @@ class OciLoadBalancer(OciResource):
                     if se.status == 404:
                         break
                     raise se
+            self._status = 'DELETED'
+            return True
+        except oci.exceptions.ServiceError as se:
+            logging.error(se.message)
+            return False
+        except Exception as e:
+            logging.error(str(e))
+            return False
+
+
+class OciDbSystem(OciResource):
+
+    def __init__(self, res, api_client: DatabaseClient = None):
+        super().__init__(res,
+                         api_client=api_client,
+                         name=res.display_name,
+                         id=res.id,
+                         res_type=R.DB)
+
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
+        if not self.is_active():
+            logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
+            return False
+
+        if simulate:
+            return True
+
+        try:
+            self._api_client.terminate_db_system(self.id)
+
+            self._status = 'DELETED'
+            return True
+        except oci.exceptions.ServiceError as se:
+            logging.error(se.message)
+            return False
+        except Exception as e:
+            logging.error(str(e))
+            return False
+
+
+class OciDbBackup(OciResource):
+
+    def __init__(self, res, api_client: DatabaseClient = None):
+        super().__init__(res,
+                         api_client=api_client,
+                         name=res.display_name,
+                         id=res.id,
+                         res_type=R.DB_BACKUP)
+
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
+        if not self.is_active():
+            logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
+            return False
+
+        if simulate:
+            return True
+
+        try:
+            self._api_client.delete_backup(self.id)
+
             self._status = 'DELETED'
             return True
         except oci.exceptions.ServiceError as se:

@@ -107,7 +107,7 @@ resource_manager_parser.add_argument('-f', '--force',
 def main():
     import sys
     if sys.version_info[0] < 3:
-        raise Exception("I'm sorry, you're Python version must be >= 3")
+        raise Exception("I'm sorry, you're Python version must be >= 3.6")
     args=parser.parse_args()
     setup_log(args)
     args.func(args)

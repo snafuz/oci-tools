@@ -12,6 +12,7 @@ dist/
 config/config
 # version file
 .bumpversion.cfg
+wip_change.log
 
 setup_guide.txt
 

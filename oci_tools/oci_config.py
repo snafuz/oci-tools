@@ -1,5 +1,5 @@
 import oci
-from .oci_resources import OciResource
+import logging
 
 
 class OCIConfig:
@@ -16,18 +16,36 @@ class OCIConfig:
         self._vcn_tree = {}
 
         self._config = oci.config.from_file(config_path)
+        self._defined_tags = {}
+        self._free_tags ={}
+
+        def _set_config_attr(k, v):
+            if v:
+                # if preserve_tags are provided, parse it
+                if k == 'preserve_tags':
+                    for tag in v.split(','):
+                        try:
+                            tag_kv = tag.split('=')
+                            tag_value = tag_kv[1] if len(tag_kv) > 1 else ''
+
+                            if tag_kv[0].find('.') > 0:
+                                self._defined_tags[tag_kv[0].split('.')[0]] = {
+                                                            tag_kv[0].split('.')[1]: tag_value}
+                            else:
+                                self._free_tags[tag_kv[0]] = tag_value
+                        except:
+                            logging.error('unable to parse tag {}'.format(tag))
+
+                setattr(self, '_config_{}'.format(k), v.split(',') if isinstance(v, str) and ',' in v else v)
 
         for key, value in self._config.items():
-            key = '_config_{}'.format(key)
-            if value:
-                setattr(self, key, value.split(',') if isinstance(value, str) and ',' in value else value)
+            _set_config_attr(key, value)
 
         # set the value from command line
         # note that it overwrites config file value
         for key, value in kwargs.items():
-            key = '_config_{}'.format(key)
-            if value:
-                setattr(self, key, value.split(',') if isinstance(value, str) and ',' in value else value)
+            _set_config_attr(key, value)
+
 
     @property
     def tenancy(self):
@@ -80,7 +98,7 @@ class OCIConfig:
     @property
     def vcn_filter(self):
         if hasattr(self, '_config_vcn_filter'):
-            return self._config_vcn_filter if isinstance(self._config_vcn_filter,list) else [self._config_vcn_filter]
+            return self._config_vcn_filter if isinstance(self._config_vcn_filter, list) else [self._config_vcn_filter]
         return None
 
     @property
@@ -115,10 +133,26 @@ class OCIConfig:
     @property
     def preserve_compartments(self):
         """
-        specify if the compartments structure need to be preserved
-        :return: configuration value of preserve_commpartment
+
+        :return:
         """
         if hasattr(self, '_config_preserve_compartments'):
-            return self._config_preserve_compartments and self._config_preserve_compartments.lower() == 'true'
+            return self._config_preserve_compartments if \
+                isinstance(self._config_preserve_compartments, list) \
+                else self._config_preserve_compartments
+        return None
+
+    @property
+    def preserve_compartment_structure(self):
+        """
+        specify if the compartments structure need to be preserved
+        :return: configuration value of preserve_compartment_structure
+        """
+        if hasattr(self, '_config_preserve_compartment_structure'):
+            return self._config_preserve_compartment_structure and self._config_preserve_compartment_structure.lower() == 'true'
         else:
             return False
+
+    @property
+    def preserve_tags(self):
+        return {'free-tags': self._free_tags, 'defined-tags': self._defined_tags}

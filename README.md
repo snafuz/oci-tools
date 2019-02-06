@@ -7,7 +7,7 @@ Python OCI Resource Manager
 ## Installation
 
 * Setup a virtualenv and install the dependencies.
-* ***The script requires python 3***
+* ***The script requires python 3.6 or above***
 
 ```bash
     $ git clone https://github.com/snafuz/oci-tools.git
@@ -52,6 +52,7 @@ Run the server
     * VCN (subnet, security list, route table, internet gateway, NAT gateway, local peering gateway, service gateway)
     * Block volume
     * Load Balancer
+    * DRG, Remote Peering Connection, IPSec Connection, CPE
 * The compartment can be deleted only from the home region
 * The cleanup process currently doesn't support cross-compartment dependencies
 
