@@ -29,7 +29,7 @@ Python OCI Resource Manager
     cd config
     cp config_template config
 ```
-see also: [how-to setup configuration file](config/configuration_setup.md) 
+see also: [how-to setup configuration file](config/configuration_file.md) 
 
 ## Usage
 
