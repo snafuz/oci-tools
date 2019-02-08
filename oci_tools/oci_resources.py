@@ -21,7 +21,11 @@ class _Registry:
         self._registry[id] = obj
 
     def get(self, id):
-        return self._registry[id]
+        try:
+            return self._registry[id]
+        except Exception as e:
+            logging.error()
+            return None
 
 
 _registry = _Registry()

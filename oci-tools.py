@@ -23,10 +23,9 @@ def resource_manager(args):
     """
         Entry point for the oci resource manager
         """
-    conf = oci_config.OCIConfig(args.config, regions=args.regions)
+    conf = oci_config.OCIConfig(args.config, regions=args.regions, profile=args.profile)
 
     training_tools.run(conf)
-
 
 
 def setup_log(args):
@@ -98,6 +97,10 @@ resource_manager_parser.add_argument('-o', '--operation',
 resource_manager_parser.add_argument('--regions',
                              help='comma separated list of regions',
                              dest='regions')
+resource_manager_parser.add_argument('--profile',
+                             help='OCI configuration profile',
+                             dest='profile',
+                             default='DEFAULT')
 resource_manager_parser.add_argument('-f', '--force',
                              help='force the delete operation without asking for confirmation',
                              default=False,

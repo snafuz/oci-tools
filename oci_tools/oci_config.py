@@ -15,6 +15,9 @@ class OCIConfig:
         self._workon_region = None
         self._vcn_tree = {}
 
+        profile = kwargs['profile'] if 'profile' in kwargs else 'DEFAULT'
+
+        #self._config = oci.config.from_file(file_location=config_path, profile_name=profile)
         self._config = oci.config.from_file(config_path)
         self._defined_tags = {}
         self._free_tags ={}

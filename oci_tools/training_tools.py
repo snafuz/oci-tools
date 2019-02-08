@@ -66,6 +66,11 @@ def cleanup(config: OCIConfig, force=False):
            tree.cleanup(config=config, force=force)
 
 
+def get_regions(conf: OCIConfig):
+
+    rs = identity_client.list_region_subscriptions(conf.tenancy)
+    logging.info(rs.data)
+
 
 def compartment_list(conf: OCIConfig):
     """
@@ -93,6 +98,7 @@ def compartment_tree_build(conf: OCIConfig):
     """
     global identity_client
     identity_client = oci.identity.IdentityClient(conf.config)
+    #get_regions(conf)
     tree = []
 
     def _get_nested_resources(api_list_call: identity_client.list_compartments, id: str, tree: []):
@@ -177,7 +183,7 @@ def _get_instance_resources(tree: OciResource, conf: OCIConfig):
                         OciResource.set_dependency(r.subnet_id, res_obj)
 
         except Exception as e:
-            logging.error('unable to retrieve {} in [{}] Instance {}'.format(res.resource_type, i.id))
+            logging.error('unable to retrieve {} Instance {}'.format(res.resource_type, i.id))
 
     for i in ilist.data:
         instance = OciInstance(i, compute_client)
@@ -217,7 +223,7 @@ def _get_network_resources(tree, conf: OCIConfig):
                     continue
                 return res_obj
         except oci.exceptions.ServiceError as se:
-            logging.error('unable to retrieve {} in [{}] VCN {}'.format(res.resource_type, vcn.id))
+            logging.error('unable to retrieve {}  VCN {}'.format(res.resource_type, vcn.id))
             return None
 
     for i in ilist.data:
