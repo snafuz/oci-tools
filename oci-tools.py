@@ -108,6 +108,7 @@ def main():
     import sys
     if sys.version_info[0] < 3:
         raise Exception("I'm sorry, you're Python version must be >= 3.6")
+    print(' ** oci-tools v.{} **'.format(__version__))
     args=parser.parse_args()
     setup_log(args)
     args.func(args)
