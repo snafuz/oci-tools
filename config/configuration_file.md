@@ -22,7 +22,7 @@ operation=cleanup
 #### preserve_compartments
 Comma separated list of compartments to keep safe. The cleanup process ignores all the listed compartments and the resources that belong to them 
 ```
-preserve_compartments
+preserve_compartments=comp_1,comp_2
 ```
 
 #### preserve_tags
@@ -33,6 +33,7 @@ The cleanup process ignores all the resources tagged with at least one of the li
     - _key_
  - defined tags must be inserted in the following format: 
     - _namespace:key=value_
+    
 ```
 preserve_tags=training.foundation=true,safe=true,not_delete
 ```   
@@ -69,5 +70,10 @@ ___Default value___: _false_
 simulate_deletion=true
 ```
 
-
+#### skip_scan_preserved_resources
+if True don't inspect preserved resources (via _preserve_compartments_ or _preserve_tags_)
+___Default value___: _true_
+```
+skip_scan_preserved_resources=false
+```
  

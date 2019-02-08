@@ -40,4 +40,8 @@ preserve_compartments=true
 # defined tags must be inserted in the following format: namespace:key=value
 preserve_tags=training.foundation=true,safe=true,not_delete
 
+#avoid to inspect preserved resources (via _preserve_compartments_ or _preserve_tags_)
+#default is true
+#skip_scan_preserved_resources=false
+
 

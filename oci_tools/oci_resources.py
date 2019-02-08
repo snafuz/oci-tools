@@ -83,7 +83,8 @@ class OciResource(dict):
         :param res:
         :return:
         """
-        self.setdefault(res_obj.resource_type, []).append(res_obj)
+        if res_obj:
+            self.setdefault(res_obj.resource_type, []).append(res_obj)
 
     @property
     def id(self):
@@ -121,15 +122,17 @@ class OciResource(dict):
         delete the resources and all the nested resources
         """
 
-        if self._check_tags(preserve_tags):
+        if self.check_tags(preserve_tags):
             logging.info('::: skip resource termination [tag] {}'.format(self.name))
-            return
+            return False
 
         logging.info(':: Terminating {} {} [{}]'.format(self.resource_type, self.name, self.id))
-        if self._terminate(simulate, preserve_tags, **kwargs):
-            logging.info(':: {} {} terminated [{}]'.format(self.resource_type,self.name, self.id))
+        if self._terminate(simulate, preserve_tags=preserve_tags, **kwargs):
+            logging.info(':: {} {} terminated [{}]'.format(self.resource_type, self.name, self.id))
+            return True
         else:
             logging.error(':: unable to terminate {} {} {}'.format(self.resource_type, self.name, self.id))
+            return False
 
     def _terminate(self, simulate=False, preserve_tags={}, **kwargs):
         """
@@ -141,7 +144,7 @@ class OciResource(dict):
     def _status(self):
         return self._lifecycle_state
 
-    def _check_tags(self, preserve_tags):
+    def check_tags(self, preserve_tags):
         for val in preserve_tags['free-tags'].keys():
             if self.freeform_tags.get(val) == preserve_tags['free-tags'].get(val):
                 return True
@@ -196,7 +199,7 @@ class OciCompartment(OciResource):
 
         # skip the compartment if in preserve_compartments list or if it's tagged with the specified tags
         if (config.preserve_compartments and self.name in config.preserve_compartments or
-                self._check_tags(config.preserve_tags)):
+                self.check_tags(config.preserve_tags)):
             return
 
         # preserve the compartment if the filter is not empty and the compartment is not in the list
@@ -225,11 +228,20 @@ class OciCompartment(OciResource):
         items = self.get(R.LB)
         for nested in [] if not items else items:
             nested.terminate(config.simulate_deletion, config.preserve_tags)
-        '''
-        items = self.get(R.DB)
+
+        items = self.get(R.DB_SYSTEM)
+        # Due to a limitation with the Data Guard implementation on VM shapes
+        # primary db-system has to be deleted before to delete db_home and
+        # standby db-system. So in case of any termination failure the terminate
+        # operation is repeated
+        repeat = False
         for nested in [] if not items else items:
-            nested.terminate(config.simulate_deletion, config.preserve_tags)
-        '''
+            repeat = not nested.terminate(config.simulate_deletion, config.preserve_tags) or repeat
+
+        if repeat:
+            for nested in [] if not items else items:
+                nested.terminate(config.simulate_deletion, config.preserve_tags)
+
         items = self.get(R.DRG_ATTACHMENT)
         for nested in [] if not items else items:
             nested.terminate(config.simulate_deletion, config.preserve_tags)
@@ -253,11 +265,11 @@ class OciCompartment(OciResource):
         items = self.get(R.DRG)
         for nested in [] if not items else items:
             nested.terminate(config.simulate_deletion, config.preserve_tags)
-        '''
+
         items = self.get(R.DB_BACKUP)
         for nested in [] if not items else items:
             nested.terminate(config.simulate_deletion, config.preserve_tags)
-        '''
+
 
         if not config.preserve_compartment_structure and not preserve_top_level_compartment:
             self.terminate(config.simulate_deletion, config.preserve_tags)
@@ -905,7 +917,7 @@ class OciDbSystem(OciResource):
                          api_client=api_client,
                          name=res.display_name,
                          id=res.id,
-                         res_type=R.DB)
+                         res_type=R.DB_SYSTEM)
 
     def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
         if not self.is_active():
@@ -916,7 +928,13 @@ class OciDbSystem(OciResource):
             return True
 
         try:
-            self._api_client.terminate_db_system(self.id)
+
+            items = self.get(R.DB_HOME)
+            for nested in [] if not items else items:
+                nested.terminate(simulate, preserve_tags, **kwargs)
+
+            oci.database.DatabaseClientCompositeOperations(self._api_client)\
+                .terminate_db_system_and_wait_for_state(self.id, LIFECYCLE_KO_STATUS)
 
             self._status = 'DELETED'
             return True
@@ -927,6 +945,36 @@ class OciDbSystem(OciResource):
             logging.error(str(e))
             return False
 
+
+class OciDBHome(OciResource):
+
+    def __init__(self, res, api_client: DatabaseClient = None):
+        super().__init__(res,
+                         api_client=api_client,
+                         name=res.display_name,
+                         id=res.id,
+                         res_type=R.DB_HOME)
+
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
+        if not self.is_active():
+            logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
+            return False
+
+        if simulate:
+            return True
+
+        try:
+            oci.database.DatabaseClientCompositeOperations(self._api_client)\
+                .delete_db_home_and_wait_for_state(self.id, LIFECYCLE_KO_STATUS)
+
+            self._status = 'DELETED'
+            return True
+        except oci.exceptions.ServiceError as se:
+            logging.error(se.message)
+            return False
+        except Exception as e:
+            logging.error(str(e))
+            return False
 
 class OciDbBackup(OciResource):
 

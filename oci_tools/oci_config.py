@@ -156,3 +156,14 @@ class OCIConfig:
     @property
     def preserve_tags(self):
         return {'free-tags': self._free_tags, 'defined-tags': self._defined_tags}
+
+    @property
+    def skip_scan_preserved_resources(self):
+        """
+        specify if preserved resources must be scanned
+        :return: Default value: True
+        """
+        if hasattr(self, '_config_skip_scan_preserved_resources'):
+            return self._config_skip_scan_preserved_resources and self._config_skip_scan_preserved_resources.lower() == 'true'
+        else:
+            return True

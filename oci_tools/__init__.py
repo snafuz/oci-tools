@@ -29,12 +29,13 @@ RESOURCE = namedtuple('RESOURCES',
                        'ROUTE_TABLE '
                        'LPEERINGGW '
                        'LB '
-                       'DB '
+                       'DB_SYSTEM '
                        'DB_BACKUP '
                        'CPE '
                        'RPC '
                        'VPN '
-                       'DRG_ATTACHMENT'
+                       'DRG_ATTACHMENT '
+                       'DB_HOME '
                         )\
     ('vcn',
      'instance',
@@ -51,12 +52,13 @@ RESOURCE = namedtuple('RESOURCES',
      'rt',
      'lpg',
      'lb',
-     'db',
+     'db_system',
      'db_backup',
      'cpe',
      'rpc',
      'vpn',
-     'drg_attachment')
+     'drg_attachment',
+     'db_home')
 
 
 LIFECYCLE_KO_STATUS =['TERMINATED',
@@ -65,4 +67,5 @@ LIFECYCLE_KO_STATUS =['TERMINATED',
 
 LIFECYCLE_INACTIVE_STATUS = ['TERMINATING',
                              'DELETING'] + LIFECYCLE_KO_STATUS
+
 

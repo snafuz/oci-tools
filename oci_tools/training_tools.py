@@ -95,11 +95,14 @@ def compartment_tree_build(conf: OCIConfig):
     identity_client = oci.identity.IdentityClient(conf.config)
     tree = []
 
-    def _get_nested_resources(api_list_call: identity_client.list_compartments, id: str, tree: []) :
+    def _get_nested_resources(api_list_call: identity_client.list_compartments, id: str, tree: []):
 
         elems = oci.pagination.list_call_get_all_results(api_list_call, id,compartment_id_in_subtree=False)
         for item in elems.data:
             compartment = OciCompartment(item, identity_client)
+            if (conf.preserve_compartments and compartment.name in conf.preserve_compartments or
+                    (conf.skip_scan_preserved_resources and compartment.check_tags(conf.preserve_tags))):
+                continue
             if not compartment.is_active():
                 continue
             _get_nested_resources(api_list_call, compartment.id, compartment)
@@ -124,11 +127,11 @@ def resource_list(conf: OCIConfig):
             traverse_level += 1
             _retrieve_resources_in_compartment(nested_item, region, traverse_level)
             traverse_level -= 1
-        _get_network_resources(tree)
-        _get_bv_resources(tree)
-        _get_instance_resources(tree)
-        _get_lb_resources(tree)
-        _get_db_resources(tree)
+        _get_network_resources(tree, conf)
+        _get_bv_resources(tree, conf)
+        _get_instance_resources(tree, conf)
+        _get_lb_resources(tree, conf)
+        _get_db_resources(tree, conf)
 
     for r in conf.compartments_tree.keys():
         # logging.info(r)
@@ -141,7 +144,7 @@ def resource_list(conf: OCIConfig):
             _retrieve_resources_in_compartment(tree, r)
 
 
-def _get_instance_resources(tree: OciResource):
+def _get_instance_resources(tree: OciResource, conf: OCIConfig):
     """
     retrieve instances and vnics
 
@@ -157,6 +160,8 @@ def _get_instance_resources(tree: OciResource):
                                                              instance_id=i.id)
             for r in rlist.data:
                 res_obj = res(r, compute_client)
+                if conf.skip_scan_preserved_resources and res_obj.check_tags(conf.preserve_tags):
+                    continue
                 if not res_obj or not res_obj.is_active():
                     continue
                 instance.append(res_obj)
@@ -183,7 +188,7 @@ def _get_instance_resources(tree: OciResource):
         tree.append(instance)
 
 
-def _get_network_resources(tree):
+def _get_network_resources(tree, conf: OCIConfig):
     """
     retrieve: vcn, subnet, gateways, secury list, route tables
 
@@ -193,57 +198,50 @@ def _get_network_resources(tree):
 
     ilist = oci.pagination.list_call_get_all_results(network_client.list_vcns, compartment_id=tree['id'])
 
-    def _get_nested_resources(api_list_call, res: OciResource):
+    def _get_nested_resources(api_list_call, res: OciResource, **kwargs):
         try:
-            rlist = oci.pagination.list_call_get_all_results(api_list_call,
+            if 'vcn_id' in kwargs:
+                rlist = oci.pagination.list_call_get_all_results(api_list_call,
                                                                  compartment_id=tree['id'],
-                                                                 vcn_id=vcn.id)
-            for r in rlist.data:
+                                                                 vcn_id=kwargs.get('vcn_id'))
+            else:
+                rlist = oci.pagination.list_call_get_all_results(api_list_call,
+                                                               compartment_id=tree['id'])
+            if not rlist.data:
+                return None
+            for r in rlist.data or []:
                 res_obj = res(r, network_client)
+                if conf.skip_scan_preserved_resources and res_obj.check_tags(conf.preserve_tags):
+                    continue
                 if not res_obj or not res_obj.is_active():
                     continue
-                vcn.append(res_obj)
+                return res_obj
         except oci.exceptions.ServiceError as se:
             logging.error('unable to retrieve {} in [{}] VCN {}'.format(res.resource_type, vcn.id))
+            return None
 
     for i in ilist.data:
         vcn = OciVcn(i, network_client)
-        _get_nested_resources(network_client.list_subnets, OciSubnet)
-        _get_nested_resources(network_client.list_internet_gateways, OciInternetGw)
-        _get_nested_resources(network_client.list_nat_gateways, OciNatGw)
-        _get_nested_resources(network_client.list_security_lists, OciSecurityList)
-        _get_nested_resources(network_client.list_route_tables, OciRouteTable)
-        _get_nested_resources(network_client.list_local_peering_gateways, OciLocalPeeringGw)
-        _get_nested_resources(network_client.list_service_gateways, OciServiceGw)
+        vcn.append(_get_nested_resources(network_client.list_subnets, OciSubnet, vcn_id=vcn.id))
+        vcn.append(_get_nested_resources(network_client.list_internet_gateways, OciInternetGw, vcn_id=vcn.id))
+        vcn.append(_get_nested_resources(network_client.list_nat_gateways, OciNatGw, vcn_id=vcn.id))
+        vcn.append(_get_nested_resources(network_client.list_security_lists, OciSecurityList, vcn_id=vcn.id))
+        vcn.append(_get_nested_resources(network_client.list_route_tables, OciRouteTable, vcn_id=vcn.id))
+        vcn.append(_get_nested_resources(network_client.list_local_peering_gateways, OciLocalPeeringGw, vcn_id=vcn.id))
+        vcn.append(_get_nested_resources(network_client.list_service_gateways, OciServiceGw, vcn_id=vcn.id))
 
         tree.append(vcn)
 
-    ilist = oci.pagination.list_call_get_all_results(network_client.list_drgs, compartment_id=tree['id'])
-    for i in ilist.data:
-        tree.append(OciDRG(i, network_client))
-
-    ilist = oci.pagination.list_call_get_all_results(network_client.list_drg_attachments, compartment_id=tree['id'])
-    for i in ilist.data:
-        tree.append(OciDRGAttachment(i, network_client))
-
-    ilist = oci.pagination.list_call_get_all_results(network_client.list_cpes, compartment_id=tree['id'])
-    for i in ilist.data:
-        tree.append(OciCPE(i, network_client))
-
-    ilist = oci.pagination.list_call_get_all_results(network_client.list_remote_peering_connections, compartment_id=tree['id'])
-    for i in ilist.data:
-        tree.append(OciRPC(i, network_client))
-
-    ilist = oci.pagination.list_call_get_all_results(network_client.list_ip_sec_connections, compartment_id=tree['id'])
-    for i in ilist.data:
-        tree.append(OciVPN(i, network_client))
+    tree.append(_get_nested_resources(network_client.list_drgs, OciDRG))
+    tree.append(_get_nested_resources(network_client.list_cpes, OciCPE))
+    tree.append(_get_nested_resources(network_client.list_drg_attachments, OciDRGAttachment))
+    tree.append(_get_nested_resources(network_client.list_remote_peering_connections, OciRPC))
+    tree.append(_get_nested_resources(network_client.list_ip_sec_connections, OciVPN))
 
 
 
 
-
-
-def _get_bv_resources(tree):
+def _get_bv_resources(tree, conf: OCIConfig):
     """
     retrieve block volumes
 
@@ -255,14 +253,16 @@ def _get_bv_resources(tree):
         ilist = oci.pagination.list_call_get_all_results(bv_client.list_volumes, compartment_id=tree['id'])
 
         for i in ilist.data:
-            bv = OciBlockVolume(i, bv_client)
-
-            tree.setdefault(bv.resource_type, []).append(bv)
+            res_obj = OciBlockVolume(i, bv_client)
+            if (conf.skip_scan_preserved_resources and res_obj.check_tags(
+                    conf.preserve_tags)) or not res_obj.is_active():
+                continue
+            tree.append(res_obj)
     except Exception as e:
         logging.error('error while retrieving Block Volume resources')
 
 
-def _get_lb_resources(tree):
+def _get_lb_resources(tree, conf: OCIConfig):
     """
     retrieve: lb resources
 
@@ -274,12 +274,13 @@ def _get_lb_resources(tree):
 
 
     for i in ilist.data:
-        lb = OciLoadBalancer(i, lb_client)
+        res_obj = OciLoadBalancer(i, lb_client)
+        if (conf.skip_scan_preserved_resources and res_obj.check_tags(conf.preserve_tags)) or not res_obj.is_active():
+            continue
+        tree.append(res_obj)
 
-        tree.append(lb)
 
-
-def _get_db_resources(tree):
+def _get_db_resources(tree, conf: OCIConfig):
     """
     retrieve: db_system resources
 
@@ -287,17 +288,23 @@ def _get_db_resources(tree):
     :param region: current region
     """
 
-
     ilist = oci.pagination.list_call_get_all_results(db_client.list_db_systems, compartment_id=tree['id'])
 
     for i in ilist.data:
-        db = OciDbSystem(i, db_client)
-
-        tree.append(db)
+        res_obj = OciDbSystem(i, db_client)
+        if (conf.skip_scan_preserved_resources and res_obj.check_tags(conf.preserve_tags)) or not res_obj.is_active():
+            continue
+        dbhomes = db_client.list_db_homes(tree['id'], res_obj.id)
+        if dbhomes and dbhomes.data:
+            for dbh in dbhomes.data:
+                res_obj.append(OciDBHome(dbh, db_client))
+        tree.append(res_obj)
 
     ilist = oci.pagination.list_call_get_all_results(db_client.list_backups, compartment_id=tree['id'])
-    for i in ilist.data:
-        db = OciDbBackup(i, db_client)
 
-        tree.append(db)
+    for i in ilist.data:
+        res_obj = OciDbBackup(i, db_client)
+        if (conf.skip_scan_preserved_resources and res_obj.check_tags(conf.preserve_tags)) or not res_obj.is_active():
+            continue
+        tree.append(res_obj)
 

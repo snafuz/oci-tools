@@ -48,13 +48,15 @@ Run the server
 ```
 
 ### Caveats
-* The script currently manage the below resources
+* The script supports the below resources
     * Compute
     * VCN (subnet, security list, route table, internet gateway, NAT gateway, local peering gateway, service gateway)
     * Block volume
     * Load Balancer
     * DRG, Remote Peering Connection, IPSec Connection, CPE
-* The compartment can be deleted only from the home region
+    * Database, Database Backup, Dataguard association (tested on VM only)
+    
+* Compartment can only be deleted from the home region
 * The cleanup process currently doesn't support cross-compartment dependencies
 
 
