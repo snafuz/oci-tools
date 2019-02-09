@@ -1,5 +1,11 @@
 ## Configuration File
 
+
+Configuration file must contains at least the _DEFAULT_ section with the OCI config and _OCI_TOOLS_ section with the script configuration.
+OCI configuration file are also supported with the command line parameter __--profile__ ___<profile_name>___
+
+Below the list of supported value in the _OCI_TOOLS_ section
+
 #### region_filter
 Comma separated region to work on. 
 Currently must not be empty.

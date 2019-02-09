@@ -5,6 +5,7 @@ key_file=
 tenancy=
 
 ########################
+[OCI_TOOLS]
 #comma separated region to work on
 #region_filter=eu-frankfurt-1,uk-london-1
 

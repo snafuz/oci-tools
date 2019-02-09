@@ -8,27 +8,29 @@ from . import LIFECYCLE_KO_STATUS, LIFECYCLE_INACTIVE_STATUS, RESOURCE as R
 from .oci_config import OCIConfig
 
 
-class _Registry:
+class Registry:
     """
     helper class to keep track of the inner dependencies not inferable via compartment scanning
     It contains a flat dict with all the resources.
     """
 
     def __init__(self):
-        self._registry = {}
+        self._resources = {}
 
     def append(self, id, obj):
-        self._registry[id] = obj
+        self._resources.setdefault(id, {}).update({'resource_type': obj.resource_type, 'resource': obj})
+
+    def set_dependency(self, id, obj):
+        self._resources.setdefault(id, {})
+        self._resources[id].setdefault('nested', []).append({obj.resource_type:obj})
 
     def get(self, id):
-        try:
-            return self._registry[id]
-        except Exception as e:
-            logging.error()
-            return None
+        if id in self._resources:
+            return self._resources[id]
+        return None
 
 
-_registry = _Registry()
+_registry = Registry()
 
 
 class OciResource(dict):
@@ -44,9 +46,7 @@ class OciResource(dict):
         :param parent_id: OCID id of the parent resource you want to append the neted to
         :param nested:  nested OCI resource
         """
-        res = _registry.get(parent_id)
-        if res:
-            res[parent_id] = nested
+        _registry.set_dependency(parent_id, nested)
 
     def __init__(self, res, api_client=None, name='resource', id=None, res_type='resource'):
         """
@@ -1008,3 +1008,4 @@ class OciDbBackup(OciResource):
         except Exception as e:
             logging.error(str(e))
             return False
+

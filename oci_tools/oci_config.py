@@ -1,5 +1,20 @@
 import oci
 import logging
+import configparser
+
+
+class OCIConfigParser(configparser.ConfigParser):
+
+    def get_config(self, profile=None):
+
+        if not profile or profile == 'DEFAULT':
+            p = dict(self._defaults)
+        else:
+            p = dict(dict(self._sections)[profile])
+
+        d = dict(dict(self._sections)['OCI_TOOLS'])
+
+        return {**p, **d}
 
 
 class OCIConfig:
@@ -17,8 +32,14 @@ class OCIConfig:
 
         profile = kwargs['profile'] if 'profile' in kwargs else 'DEFAULT'
 
-        #self._config = oci.config.from_file(file_location=config_path, profile_name=profile)
-        self._config = oci.config.from_file(config_path)
+        cfg_parser = OCIConfigParser()
+        cfg_parser.read(config_path)
+        if not cfg_parser.has_section('OCI_TOOLS'):
+            logging.error('Unable to find OCI_TOOLS section in the configuration file. '
+                          '\nCheck your configuration and run the script again')
+            exit(-1)
+        self._config = oci.config.from_file(file_location=config_path, profile_name=profile)
+
         self._defined_tags = {}
         self._free_tags ={}
 
@@ -41,7 +62,9 @@ class OCIConfig:
 
                 setattr(self, '_config_{}'.format(k), v.split(',') if isinstance(v, str) and ',' in v else v)
 
-        for key, value in self._config.items():
+
+
+        for key, value in cfg_parser.get_config(profile).items():
             _set_config_attr(key, value)
 
         # set the value from command line
