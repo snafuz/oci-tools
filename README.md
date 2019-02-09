@@ -47,6 +47,12 @@ Run the server
     (venv_oci-tools) $ python3 oci-tools.py resource-manager 
 ```
 
+To refer to a specific configuration profile, use
+
+```bash
+    (venv_oci-tools) $ python3 oci-tools.py resource-manager --profile <PROFILE_NAME> 
+```
+
 ### Caveats
 * The script supports the below resources
     * Compute
