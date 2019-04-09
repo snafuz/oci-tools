@@ -3,21 +3,20 @@ import logging
 import configparser
 
 
-class OCIConfigParser(configparser.ConfigParser):
-
-    def get_config(self, profile=None):
-
-        if not profile or profile == 'DEFAULT':
-            p = dict(self._defaults)
-        else:
-            p = dict(dict(self._sections)[profile])
-
-        d = dict(dict(self._sections)['OCI_TOOLS'])
-
-        return {**p, **d}
-
-
 class OCIConfig:
+
+    class __OCIConfigParser(configparser.ConfigParser):
+
+        def get_config(self, profile=None):
+
+            if not profile or profile == 'DEFAULT':
+                p = dict(self._defaults)
+            else:
+                p = dict(dict(self._sections)[profile])
+
+            d = dict(dict(self._sections)['OCI_TOOLS'])
+
+            return {**p, **d}
 
     def __init__(self, config_path=None, **kwargs):
         """
@@ -32,7 +31,7 @@ class OCIConfig:
 
         profile = kwargs['profile'] if 'profile' in kwargs else 'DEFAULT'
 
-        cfg_parser = OCIConfigParser()
+        cfg_parser = self.__OCIConfigParser()
         cfg_parser.read(config_path)
         if not cfg_parser.has_section('OCI_TOOLS'):
             logging.error('Unable to find OCI_TOOLS section in the configuration file. '
@@ -62,8 +61,6 @@ class OCIConfig:
 
                 setattr(self, '_config_{}'.format(k), v.split(',') if isinstance(v, str) and ',' in v else v)
 
-
-
         for key, value in cfg_parser.get_config(profile).items():
             _set_config_attr(key, value)
 
@@ -72,22 +69,25 @@ class OCIConfig:
         for key, value in kwargs.items():
             _set_config_attr(key, value)
 
+        self._region_subscriptions = None
+        self._home_region = None
+
 
     @property
     def tenancy(self):
         return self._config_tenancy
 
-    @property    
+    @property
     def compartments_scope(self):
         """
         compartment list to work with
         """
         return self._config_compartment if hasattr(self, '_config_compartment') and self._config_compartment else self._config_tenancy
-    
+
     @property
     def compartments_tree(self):
         return self._compartments_tree
-    
+
     @compartments_tree.setter
     def compartments_tree(self,c_tree):
         self._compartments_tree = c_tree
@@ -110,10 +110,29 @@ class OCIConfig:
         self._config['region'] = region
 
     @property
+    def region_subscriptions(self):
+        return self._region_subscriptions
+
+    @region_subscriptions.setter
+    def region_subscriptions(self, rsubs):
+        # set home region
+        self._home_region = next(x for x in rsubs if x.is_home_region).region_name
+        # set the subscribed regions
+        # if region_filter is not None, remove the regions that are not listed in the filter
+        if self.region_filter:
+            self._region_subscriptions = [i for i in rsubs if i.region_name in self.region_filter]
+        else:
+            self._region_subscriptions = rsubs
+
+    @property
     def region_filter(self):
         if hasattr(self, '_config_region_filter'):
             return self._config_region_filter if isinstance(self._config_region_filter,list) else [self._config_region_filter]
         return None
+
+    @property
+    def home_region(self):
+        return self._home_region
 
     @property
     def compartment_filter(self):

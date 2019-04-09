@@ -19,6 +19,7 @@ def training(args):
 
     training_tools.run(conf)
 
+
 def resource_manager(args):
     """
         Entry point for the oci resource manager
@@ -77,34 +78,32 @@ training_parser.add_argument('--config',
                              help='OCI configuration file',
                              dest='config',
                              default='./config/config')
+# deprecated
 training_parser.add_argument('--regions',
-                             help='comma separated list of regions',
+                             help='[DEPRECATED] comma separated list of regions',
                              dest='regions')
     
 resource_manager_parser = sub01.add_parser('resource-manager',
-                                   help="utility to manage oci environments")
+                                           help="utility to manage oci environments")
 resource_manager_parser.set_defaults(func=resource_manager)
 resource_manager_parser.add_argument('--config',
-                             help='OCI configuration file',
-                             dest='config',
-                             default='./config/config')
+                                     help='OCI configuration file',
+                                     dest='config',
+                                     default='./config/config')
 # WARNING below parameters are not yet managed in the code
 # USE CONFIG FILE
 resource_manager_parser.add_argument('-o', '--operation',
-                             dest='operation',
-                             default='list',
-                             choices=['list', 'delete'])
-resource_manager_parser.add_argument('--regions',
-                             help='comma separated list of regions',
-                             dest='regions')
+                                     dest='operation',
+                                     default='list',
+                                     choices=['list', 'delete'])
 resource_manager_parser.add_argument('--profile',
-                             help='OCI configuration profile',
-                             dest='profile',
-                             default='DEFAULT')
+                                     help='OCI configuration profile',
+                                     dest='profile',
+                                     default='DEFAULT')
 resource_manager_parser.add_argument('-f', '--force',
-                             help='force the delete operation without asking for confirmation',
-                             default=False,
-                             dest='clean_force')
+                                     help='force the delete operation without asking for confirmation',
+                                     default=False,
+                                     dest='clean_force')
 
 
 def main():

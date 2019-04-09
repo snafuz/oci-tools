@@ -12,9 +12,9 @@ tenancy=
 #available operation:
 # - list: scan the tenancy and list all the resources
 # - cleanup: delete all but toplevel compartments
-# - delete: delete all (currently = cleanup
+# - terminate-all: terminate all resources (currently = cleanup)
 #operation=list
-#operation=delete
+#operation=termina-all
 operation=cleanup
 
 #comma separated compartment OCID to cleanup

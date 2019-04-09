@@ -225,6 +225,10 @@ class OciCompartment(OciResource):
 
         logging.info(':: cleaning up compartment {} [{}]'.format(self.name, self.id))
 
+        items = self.get(R.AUTONOMOUS_DB)
+        for nested in [] if not items else items:
+            nested.terminate(config.simulate_deletion, config.preserve_tags)
+
         items = self.get(R.INSTANCE)
         for nested in [] if not items else items:
             nested.terminate(config.simulate_deletion, config.preserve_tags)
@@ -235,8 +239,8 @@ class OciCompartment(OciResource):
 
         items = self.get(R.DB_SYSTEM)
         # Due to a limitation with the Data Guard implementation on VM shapes
-        # primary db-system has to be deleted before to delete db_home and
-        # standby db-system. So in case of any termination failure the terminate
+        # primary db-system must be deleted before deleting db_home and
+        # standby db-system. So in case of any termination failure terminate
         # operation is repeated
         repeat = False
         for nested in [] if not items else items:
@@ -273,7 +277,6 @@ class OciCompartment(OciResource):
         items = self.get(R.DB_BACKUP)
         for nested in [] if not items else items:
             nested.terminate(config.simulate_deletion, config.preserve_tags)
-
 
         if not config.preserve_compartment_structure and not preserve_top_level_compartment:
             self.terminate(config.simulate_deletion, config.preserve_tags)
@@ -551,6 +554,7 @@ class OciDRG(OciResource):
             logging.error(str(e))
             return False
 
+
 class OciDRGAttachment(OciResource):
 
     def __init__(self, res, api_client: VirtualNetworkClient = None):
@@ -606,6 +610,7 @@ class OciCPE(OciResource):
         except Exception as e:
             logging.error(str(e))
             return False
+
 
 class OciRPC(OciResource):
 
@@ -980,6 +985,7 @@ class OciDBHome(OciResource):
             logging.error(str(e))
             return False
 
+
 class OciDbBackup(OciResource):
 
     def __init__(self, res, api_client: DatabaseClient = None):
@@ -1009,3 +1015,39 @@ class OciDbBackup(OciResource):
             logging.error(str(e))
             return False
 
+
+class OciAutonomousDB(OciResource):
+
+    def __init__(self, res, api_client: DatabaseClient = None):
+        super().__init__(res,
+                         api_client=api_client,
+                         name=res.display_name,
+                         id=res.id,
+                         res_type=R.AUTONOMOUS_DB)
+
+    def _terminate(self,  simulate=False, preserve_tags={}, **kwargs):
+        if not self.is_active():
+            logging.info('{} resource {} is not active'.format(self.resource_type, self.id))
+            return False
+
+        if simulate:
+            return True
+
+        try:
+            oci.database.DatabaseClientCompositeOperations(self._api_client)\
+                .delete_autonomous_database_and_wait_for_state(self.id, LIFECYCLE_KO_STATUS)
+            # if self.is_atp :
+            #     oci.database.DatabaseClientCompositeOperations(self._api_client)\
+            #     .delete_autonomous_database_and_wait_for_state(self.id, LIFECYCLE_KO_STATUS)
+            # else:
+            #     oci.database.DatabaseClientCompositeOperations(self._api_client)\
+            #         .delete_autonomous_data_warehouse_and_wait_for_state(self.id, LIFECYCLE_KO_STATUS)
+
+            self._status = 'DELETED'
+            return True
+        except oci.exceptions.ServiceError as se:
+            logging.error(se.message)
+            return False
+        except Exception as e:
+            logging.error(str(e))
+            return False

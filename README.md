@@ -61,6 +61,7 @@ To refer to a specific configuration profile, use
     * Load Balancer
     * DRG, Remote Peering Connection, IPSec Connection, CPE
     * Database, Database Backup, Dataguard association (tested on VM only)
+    * Autonomous DB (ATP, ADW)
     
 * Compartment can only be deleted from the home region
 * The cleanup process currently doesn't support cross-compartment dependencies

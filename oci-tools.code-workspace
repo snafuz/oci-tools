@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"python.venvPath": "~/.virtualenv",
+		"python.linting.enabled": true
+	},
+
+}

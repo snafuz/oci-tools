@@ -12,6 +12,13 @@ __description__=""
 
 from collections import namedtuple
 
+REGIONS = ['ca-toronto-1',
+           'us-ashburn-1',
+           'us-phoenix-1',
+           'ca-toronto-1',
+           'eu-frankfurt-1',
+           'uk-london-1']
+
 # resource name identifier
 RESOURCE = namedtuple('RESOURCES',
                        'VCN '
@@ -36,6 +43,7 @@ RESOURCE = namedtuple('RESOURCES',
                        'VPN '
                        'DRG_ATTACHMENT '
                        'DB_HOME '
+                       'AUTONOMOUS_DB'
                         )\
     ('vcn',
      'instance',
@@ -58,7 +66,8 @@ RESOURCE = namedtuple('RESOURCES',
      'rpc',
      'vpn',
      'drg_attachment',
-     'db_home')
+     'db_home',
+     'autonomous_db')
 
 
 LIFECYCLE_KO_STATUS =['TERMINATED',

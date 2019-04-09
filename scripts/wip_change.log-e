@@ -1,0 +1,4 @@
+Version 0.1.4
+- manage Autonomous DB
+- update to oci 2.2.5
+- better support to region: home region and subscribed regions discovery
