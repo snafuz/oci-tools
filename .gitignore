@@ -1,12 +1,14 @@
 **/.gitignore
 # ignore all logs
 *.log
+!change.log
 # folders
 test/
 dist/
 
 .vscode/
 .idea/
+*.code-workspace
 
 # config file
 config/config

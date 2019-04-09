@@ -1,0 +1,28 @@
+Version 0.1.4
+- manage Autonomous DB
+- update to oci 2.2.5
+- better support to region: home region and subscribed regions discovery
+--
+Version 0.1.3
+bug fix
+support to OCI configuration profiles
+
+--
+Version 0.1.2
+- scan optimization
+- support for DB-System, DB Backup, DataGuard Association
+
+--
+Version 0.1.1
+- change command line parameter training --> resource-manager as the discovery and clean-up funtions are not specific for training environment
+- added support for DRG, Remote Peering Connection, CPE and IPSec Connection
+- added support to preserve resource via tags and compartment names
+- check python version >= 3 at startup
+
+--
+Version 0.1.0
+initial release include support to
+    - compute
+    - vcn (subnet, security list, internet gateway, nat gateway, drg)
+    - block volume (no backup)
+    - load balancer
