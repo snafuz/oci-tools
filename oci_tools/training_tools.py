@@ -120,7 +120,6 @@ def compartment_tree_build(conf: OCIConfig):
     """
     global identity_client
     identity_client = oci.identity.IdentityClient(conf.config)
-    #get_regions(conf)
     tree = []
 
     def _get_nested_resources(api_list_call: identity_client.list_compartments, id: str, tree: []):

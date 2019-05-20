@@ -21,6 +21,12 @@ operation=cleanup
 #if empty all the compartment are terminated
 #compartment_flter=
 
+# Specify if the compartment_filter apply only to the top level 
+# compartment. If false the process scans the whole compartment structure.
+# [DEFAULT=true]
+# WORK IN PROGRES
+# compartment_filter_toplevel-only=false
+
 # if true don't delete the top level compartments
 # in case compartment_filter is used then the compartments specified will be the top level compartments
 preserve_top_level_compartment=true

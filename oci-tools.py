@@ -11,20 +11,11 @@ def print_help(args):
     parser.print_help()
 
 
-def training(args):
-    """
-    Entry point for the oci training toolkit
-    """
-    conf = oci_config.OCIConfig(args.config, regions=args.regions)
-
-    training_tools.run(conf)
-
-
 def resource_manager(args):
     """
-        Entry point for the oci resource manager
-        """
-    conf = oci_config.OCIConfig(args.config, regions=args.regions, profile=args.profile)
+    Entry point for the oci resource manager
+    """
+    conf = oci_config.OCIConfig(args.config, profile=args.profile)
 
     training_tools.run(conf)
 
@@ -71,17 +62,6 @@ parser.add_argument('--log-output',
 
 
 sub01 = parser.add_subparsers(help="OCI toolkit")
-training_parser = sub01.add_parser('training',
-                                   help="utility to manage training environments")
-training_parser.set_defaults(func=training)
-training_parser.add_argument('--config',
-                             help='OCI configuration file',
-                             dest='config',
-                             default='./config/config')
-# deprecated
-training_parser.add_argument('--regions',
-                             help='[DEPRECATED] comma separated list of regions',
-                             dest='regions')
     
 resource_manager_parser = sub01.add_parser('resource-manager',
                                            help="utility to manage oci environments")
@@ -103,7 +83,7 @@ resource_manager_parser.add_argument('--profile',
 resource_manager_parser.add_argument('-f', '--force',
                                      help='force the delete operation without asking for confirmation',
                                      default=False,
-                                     dest='clean_force')
+                                     dest='clean_force')                           
 
 
 def main():

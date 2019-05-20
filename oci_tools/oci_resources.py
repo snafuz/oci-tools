@@ -388,6 +388,11 @@ class OciVcn(OciResource):
             for nested in [] if not items else items:
                 nested.terminate(simulate, preserve_tags, **kwargs)
 
+            # repeat the route table termination to
+            items = self.get(R.ROUTE_TABLE)
+            for nested in [] if not items else items:
+                nested.terminate(simulate, preserve_tags, **kwargs)
+
             items = self.get(R.LPEERINGGW)
             for nested in [] if not items else items:
                 nested.terminate(simulate, preserve_tags, **kwargs)
@@ -582,6 +587,7 @@ class OciDRGAttachment(OciResource):
         except Exception as e:
             logging.error(str(e))
             return False
+
 
 class OciCPE(OciResource):
 

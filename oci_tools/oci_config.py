@@ -20,7 +20,7 @@ class OCIConfig:
 
     def __init__(self, config_path=None, **kwargs):
         """
-        Init OCIConfig dynamically creating attributes based on the configuration file or command line parameters
+        Init OCIConfig dynamically cerates attributes based on the configuration file or command line parameters
         :param config_path: configuration file path
         :param kwargs: command line parameters
         """
@@ -139,6 +139,15 @@ class OCIConfig:
         if hasattr(self, '_config_compartment_filter'):
             return self._config_compartment_filter if isinstance(self._config_compartment_filter,list) else [self._config_compartment_filter]
         return None
+
+    @property
+    def compartment_filter_toplevel_only(self):
+        """
+        TODO: implement filter action applied only at top level compartments
+        """
+        if hasattr(self, '_config_compartment_filter_toplevel_only'):
+            return self._config_compartment_filter_toplevel_only and _config_compartment_filter_toplevel_only.lower() == 'true'
+        return True
 
     @property
     def vcn_filter(self):
