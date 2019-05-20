@@ -1,7 +1,7 @@
 Version 0.1.5
 - removed deprecated command arguments
 - update to OCI Pyhton SDK 2.2.9
-- 
+- solved issue with region argument
 --
 Version 0.1.4
 - manage Autonomous DB
