@@ -13,7 +13,7 @@ dist/
 # config file
 config/config
 # version file
-.bumpversion.cfg
+#.bumpversion.cfg
 wip_change.log
 
 setup_guide.txt

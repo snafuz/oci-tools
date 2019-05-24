@@ -15,11 +15,12 @@ region_filter=eu-frankfurt-1,uk-london-1
 ```
 
 #### operation
-
+> This parameter can be overridden by command line argument
 available operation:
- - ___list___: scan the tenancy and list all the resources
+ - ___list___: scan the tenancy and list all the resources (Default)
  - ___cleanup___: delete all but toplevel compartments
- - ___delete___: delete all (currently = cleanup
+ - ___dryrun___: emulate _cleanup_ without affect any resource
+ - ___destroy___: delete all (NOT IMPLEMENTED)
  
 ```
 operation=cleanup
@@ -69,12 +70,6 @@ preserve_compartments=true
 ```
 
 
-#### simulate_deletion
-simulate the cleanup without affect any resource
-___Default value___: _false_
-```
-simulate_deletion=true
-```
 
 #### skip_scan_preserved_resources
 if True don't inspect preserved resources (via _preserve_compartments_ or _preserve_tags_)

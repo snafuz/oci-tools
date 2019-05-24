@@ -3,6 +3,7 @@ import oci
 from oci.core import *
 from oci.load_balancer import *
 from oci.database import *
+import json
 
 from . import LIFECYCLE_KO_STATUS, LIFECYCLE_INACTIVE_STATUS, RESOURCE as R
 from .oci_config import OCIConfig
@@ -104,7 +105,7 @@ class OciResource(dict):
 
     @property
     def compartment(self):
-        return self.compartment
+        return self._compartment
 
     @property
     def resource_type(self):
@@ -158,6 +159,16 @@ class OciResource(dict):
                 for val in preserve_tags['defined-tags'].get(ns).keys():
                     if self.defined_tags[ns].get(val) == preserve_tags['defined-tags'][ns].get(val):
                         return True
+    
+    def to_json(self, level=0):
+        r = json.loads(str(self.resource))
+        r['nested_resource'] = []
+        for k in self.keys():
+            if not k in ['id', 'name']:
+                for o in self.get(k):
+                    r['nested_resource'].append(o.to_json(level+1))
+        return r
+
 
 
 ####################################

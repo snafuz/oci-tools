@@ -1,5 +1,8 @@
 
-from pprint import pformat
+import yaml
+import sys
+from distutils.util import strtobool
+
 
 from .oci_resources import *
 
@@ -34,13 +37,26 @@ def run(config: OCIConfig):
 
     get_regions(config)
 
-    scan_tenancy(config)
+    if config.operation == 'destory':
+        logging.error('sorry destroy operation is not implemented yet')
+
+   # scan_tenancy(config)
     # currently cleanup and terminate-all are equivalent
-    if config.operation == 'terminate-all':
-        cleanup(config)
-    elif config.operation == 'cleanup':
+    
+    question = 'WARNING cleanup operation will terminate all the resources according with the configuration you have provided. \nThis operation can not be undone. Do you want to proceed?'
+    if config.operation ==  'dryrun' or \
+        (config.operation == 'cleanup' and  (config.auto_approve or \
+                                                _prompt(question))):
         cleanup(config)
 
+def _prompt(question):
+    sys.stdout.write('{} [y/n]: '.format(question))
+    i = input()
+    try:
+        ret = strtobool(i)
+    except ValueError:
+        return _prompt('Please answer with')
+    return ret
 
 def scan_tenancy(config: OCIConfig):
     """
@@ -50,7 +66,18 @@ def scan_tenancy(config: OCIConfig):
     """
     compartment_list(config)
     resource_list(config)
-    logging.info('{}'.format(pformat(config.compartments_tree)))
+    json_structure = get_json(config)
+    
+    if config.use_yaml_format:
+        output = yaml.dump(json_structure, indent=3, sort_keys=True)
+    else:
+        output = json.dumps(json_structure, indent=3, sort_keys=True)
+
+    logging.info('{}'.format(output))
+    if(config.print_to_file):
+        with open(config.output_file, 'w') as output_file:
+            output_file.write(output)
+
 
 
 def cleanup(config: OCIConfig, force=False):
@@ -59,7 +86,7 @@ def cleanup(config: OCIConfig, force=False):
     TODO: currently the cleanup operation follow the compartment tree. It should take in consideration the dependency tree
 
     :param config: OCIConfig object
-    :param force: terminate also the top level compartment
+    :param force: terminate also the top level compartment [not used]
     """
 
     for r in config.compartments_tree.keys():
@@ -69,6 +96,18 @@ def cleanup(config: OCIConfig, force=False):
 
         for tree in config.compartments_tree[r]:
             tree.cleanup(config=config, force=force)
+
+def get_json(config: OCIConfig):
+    """
+        produce envorinment json tree
+    """
+    j = json.loads('{}')
+    for r in config.compartments_tree.keys():
+        j[r]=[]
+        for tree in config.compartments_tree[r]:
+            j[r].append(tree.to_json())
+    return j
+   
 
 
 def get_regions(conf: OCIConfig):
@@ -103,14 +142,7 @@ def compartment_list(conf: OCIConfig):
     region_tree = {}
     for r in conf.region_subscriptions:
         conf.workon_region = r.region_name
-        # TODO: implement copy function to avoid scanning compartment for each region
         region_tree[r.region_name] = compartment_tree_build(conf)
-        '''
-        logging.info('_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-')
-        logging.info('Compartment tree')
-        logging.info('Region: {}\n{}'.format(r, pformat(region_tree[r])))
-        logging.info('_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-')
-        '''
     conf.compartments_tree = region_tree
 
 

@@ -15,7 +15,13 @@ def resource_manager(args):
     """
     Entry point for the oci resource manager
     """
-    conf = oci_config.OCIConfig(args.config, profile=args.profile)
+    conf = oci_config.OCIConfig(args.config, 
+                                profile=args.profile, 
+                                operation=args.operation,
+                                use_yaml_format=args.use_yaml_format,
+                                output_file=args.output_file,
+                                auto_approve=args.auto_approve
+                                )
 
     training_tools.run(conf)
 
@@ -70,20 +76,30 @@ resource_manager_parser.add_argument('--config',
                                      help='OCI configuration file',
                                      dest='config',
                                      default='./config/config')
-# WARNING below parameters are not yet managed in the code
-# USE CONFIG FILE
+
 resource_manager_parser.add_argument('-o', '--operation',
                                      dest='operation',
                                      default='list',
-                                     choices=['list', 'delete'])
+                                     choices=['list', 'cleanup', 'dryrun'])
 resource_manager_parser.add_argument('--profile',
                                      help='OCI configuration profile',
                                      dest='profile',
                                      default='DEFAULT')
-resource_manager_parser.add_argument('-f', '--force',
-                                     help='force the delete operation without asking for confirmation',
-                                     default=False,
-                                     dest='clean_force')                           
+resource_manager_parser.add_argument('--auto-approve',
+                                     help='force the cleanup operation without asking for confirmation',
+                                     action='store_true',
+                                     dest='auto_approve')  
+resource_manager_parser.add_argument('--json',
+                                     help='print output in json format [DEFAULT]',
+                                     action='store_true',
+                                     dest='use_json_format')   
+resource_manager_parser.add_argument('--yaml',
+                                     help='print output in json format',
+                                     action='store_true',
+                                     dest='use_yaml_format')   
+resource_manager_parser.add_argument('--output',
+                                     help='output file',
+                                     dest='output_file')                         
 
 
 def main():

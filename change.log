@@ -1,3 +1,9 @@
+Version 0.1.6
+- implemented print output in json and yaml
+- implemented write output to file
+- introduced operation dryrun instead of simulate_deletion parameter 
+- ask confirmation before cleanup
+--
 Version 0.1.5
 - removed deprecated command arguments
 - update to OCI Pyhton SDK 2.2.9

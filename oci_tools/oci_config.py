@@ -30,6 +30,10 @@ class OCIConfig:
         self._vcn_tree = {}
 
         profile = kwargs['profile'] if 'profile' in kwargs else 'DEFAULT'
+        self._use_yaml_format = kwargs['use_yaml_format'] if 'use_yaml_format' in kwargs else False
+        self._output_file = kwargs['output_file'] if 'output_file' in kwargs else ''
+        self._auto_approve = kwargs['auto_approve'] if 'auto_approve' in kwargs else False
+
 
         cfg_parser = self.__OCIConfigParser()
         cfg_parser.read(config_path)
@@ -71,6 +75,14 @@ class OCIConfig:
 
         self._region_subscriptions = None
         self._home_region = None
+
+        # command lime argument overwrite the configuration file 
+        # if no operation is provided, list is executed
+        if 'operation' in kwargs:
+               self._config_operation = kwargs['operation'] 
+        else: 
+            if not hasattr(self, '_config_operation') or not self._config_operation:
+                self._config_operation = 'list'
 
 
     @property
@@ -157,12 +169,8 @@ class OCIConfig:
 
     @property
     def simulate_deletion(self):
-        try:
-            if hasattr(self, '_config_simulate_deletion'):
-                return self._config_simulate_deletion and self._config_simulate_deletion.lower() == 'true'
-        except:
-            pass
-        return False
+        
+        return self._config_operation == 'dryrun'
 
     @property
     def operation(self):
@@ -171,7 +179,7 @@ class OCIConfig:
 
         :return: operation
         """
-        return self._config_operation if hasattr(self, '_config_operation') and self._config_operation else 'list'
+        return self._config_operation 
 
     @property
     def preserve_top_level_compartment(self):
@@ -221,3 +229,20 @@ class OCIConfig:
             return self._config_skip_scan_preserved_resources and self._config_skip_scan_preserved_resources.lower() == 'true'
         else:
             return True
+    
+
+    @property
+    def use_yaml_format(self):
+        return self._use_yaml_format
+    
+    @property
+    def output_file(self):
+        return self._output_file
+    
+    @property
+    def print_to_file(self):
+        return bool(self._output_file)
+
+    @property
+    def auto_approve(self):
+        return self._auto_approve

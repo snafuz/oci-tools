@@ -12,10 +12,12 @@ tenancy=
 #available operation:
 # - list: scan the tenancy and list all the resources
 # - cleanup: delete all but toplevel compartments
-# - terminate-all: terminate all resources (currently = cleanup)
-#operation=list
-#operation=termina-all
-operation=cleanup
+# - dryrun:  emulate cleanup without affecting any resource
+# - destroy: terminate all resources (not implemented yet)
+operation=list
+#operation=dryrun
+#operation=cleanup
+#operation=destroy
 
 #comma separated compartment OCID to cleanup
 #if empty all the compartment are terminated
@@ -33,10 +35,6 @@ preserve_top_level_compartment=true
 
 # Preserve the compartment structure
 preserve_compartments=true
-
-
-#simulate the cleanup without affect any resource
-#simulate_deletion=true
 
 
 # comma separated list of compartments to keep safe

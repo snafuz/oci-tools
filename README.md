@@ -4,7 +4,7 @@
 
 Python OCI Resource Manager
 
-## Installation
+## Installation 
 
 * Setup a virtualenv and install the dependencies.
 * ***The script requires python 3.6 or above***
@@ -20,10 +20,14 @@ Python OCI Resource Manager
     (venv_oci-tools) $ pip3 install -r requirements.txt
 
 ```
-
+> Depending on the amount of resources and your nework connection speed the process can take several minutes to complete. To experience better performance you should run it from inside OCI tenancy.  
 [Here](docs/ol_linux_setup.md) the Oracle Linux OCI instance setup
 
-* Prepare configuration file:
+
+
+## Usage
+
+#### Prepare configuration file:
 
 ```bash
     cd config
@@ -31,26 +35,47 @@ Python OCI Resource Manager
 ```
 see also: [how-to setup configuration file](config/configuration_file.md) 
 
-## Usage
+#### Run the process
 
-#### Training toolkit
+Supported operation:
+- ___list___: scan the tenancy and retrieve all the resources (Default) 
+- ___cleanup___: terminate all reosurces in tenancy or in a specific compartment, but top level compartments
+- ___dryrun___: emulate _cleanup_ without affecting any resource
 
-Training toolkit 
-- scan the tenancy and retrieve all the resources 
-- clean-up the tenancy (all reosurces in tenancy or in a specific compartment)
 
-Run the server
 ```bash
     #enter in virtualenv
     $ . venv_oci-tools/bin/activate
 
-    (venv_oci-tools) $ python3 oci-tools.py resource-manager 
+    (venv_oci-tools) $ python3 oci-tools.py resource-manager --config <CONFIG_FILE_PATH>
+```
+If no configuration file is provided, the process will load `./config/config`
+
+Operation can be provided as command line argument or in the config file.
+
+```bash
+    (venv_oci-tools) $ python3 oci-tools.py resource-manager --operation [list|dryrun|cleanup]
 ```
 
 To refer to a specific configuration profile, use
 
 ```bash
     (venv_oci-tools) $ python3 oci-tools.py resource-manager --profile <PROFILE_NAME> 
+```
+
+By default the structure is printed out in json format. If you want it to be in yaml
+
+```bash
+    (venv_oci-tools) $ python3 oci-tools.py resource-manager --yaml 
+```
+
+To store the structure in a file
+```bash
+    (venv_oci-tools) $ python3 oci-tools.py resource-manager --output <FILE_PATH> 
+
+    # or
+
+     (venv_oci-tools) $ python3 oci-tools.py resource-manager --yaml --output <FILE_PATH> 
 ```
 
 ### Caveats
